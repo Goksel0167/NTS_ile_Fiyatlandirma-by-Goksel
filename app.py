@@ -52,8 +52,8 @@ def save_tcmb_history(date_key, rates):
 
 def fetch_tcmb_for_date(date_obj):
     date_str = date_obj.strftime('%d%m%Y')
-    year = date_str[:4]
-    month = date_str[2:4]
+    year = date_obj.year
+    month = f"{date_obj.month:02d}"
     url = f"https://www.tcmb.gov.tr/kurlar/{year}{month}/{date_str}.xml"
     try:
         response = requests.get(url, timeout=10)
@@ -663,14 +663,15 @@ if page == "Fiyat Hesaplama":
                 min_val = df_sonuc.loc[df_sonuc['HasPrice'], 'Satis_TL'].min()
                 max_val = df_sonuc.loc[df_sonuc['HasPrice'], 'Satis_TL'].max()
 
+                # HasPrice bilgisini koruyarak display_df oluştur
+                display_df = df_sonuc[['Fabrika_Adi', 'Firma', 'Arac', 'NTS_TL', 'Nakliye_TL', 'Toplam_Maliyet_TL', 'Satis_TL', 'Satis_USD_KG', 'Satis_EUR_KG', 'Satis_CHF_KG', 'Satis_TL_TON', 'Satis_USD_TON', 'Satis_EUR_TON', 'Satis_CHF_TON', 'HasPrice']].copy()
+                
                 def row_style(row):
                     if not row['HasPrice']:
                         return ['background-color: #f0f0f0'] * len(row)
                     return [''] * len(row)
 
-                display_df = df_sonuc[['Fabrika_Adi', 'Firma', 'Arac', 'NTS_TL', 'Nakliye_TL', 'Toplam_Maliyet_TL', 'Satis_TL', 'Satis_USD_KG', 'Satis_EUR_KG', 'Satis_CHF_KG', 'Satis_TL_TON', 'Satis_USD_TON', 'Satis_EUR_TON', 'Satis_CHF_TON']]
-
-                styled_df = display_df.style.apply(lambda row: row_style(df_sonuc.loc[row.name]), axis=1).map(
+                styled_df = display_df.style.apply(row_style, axis=1).map(
                     lambda v: color_scale(v, min_val, max_val), subset=value_cols
                 ).format({
                     'NTS_TL': lambda v: '-' if pd.isna(v) else f"{v:.2f}",
@@ -683,8 +684,9 @@ if page == "Fiyat Hesaplama":
                     'Satis_TL_TON': lambda v: '-' if pd.isna(v) else f"{v:,.2f} ₺",
                     'Satis_USD_TON': lambda v: '-' if pd.isna(v) else f"${v:,.2f}",
                     'Satis_EUR_TON': lambda v: '-' if pd.isna(v) else f"€{v:,.2f}",
-                    'Satis_CHF_TON': lambda v: '-' if pd.isna(v) else f"₣{v:,.2f}"
-                })
+                    'Satis_CHF_TON': lambda v: '-' if pd.isna(v) else f"₣{v:,.2f}",
+                    'HasPrice': lambda v: ''
+                }).hide(axis='columns', subset=['HasPrice'])
 
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
@@ -696,7 +698,9 @@ if page == "Fiyat Hesaplama":
         # Hesaplama kaydı butonu - session state'teki en_ucuz'u kullan
         kayit_en_ucuz = st.session_state.get('en_ucuz')
         if kayit_en_ucuz:
-            if st.button("💾 Hesaplamayı Kaydet", type="primary"):
+            st.markdown("---")
+            st.info("✅ Hesaplama tamamlandı. Kaydetmek için butona basın.")
+            if st.button("💾 Hesaplamayı Kaydet", type="primary", key="kaydet_btn"):
                 kayit_kurlar = st.session_state.get('kullanilan_kurlar', kurlar)
                 record = {
                     'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
