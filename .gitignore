@@ -1,0 +1,3 @@
+users.json
+*.pyc
+__pycache__/

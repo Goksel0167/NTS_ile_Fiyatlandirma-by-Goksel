@@ -1,5 +1,151 @@
-Ürün Adı,Fabrika,Fiyat,Para_Birimi,Guncelleme_Tarihi
-Sika Viscocrete HT 2541,TR16,19.7436,TL,2026-01-02
-Sika Viscocrete PC 61,TR16,20.3939,TL,2026-01-02
-Sikament 524 RMC,TR15,15.5,TL,2026-01-02
-Sika Paver HC-1,TR14,25.0,TL,2026-01-02
+Urun_Adi,Fabrika,NTS_Maliyet_TL,Kayit_Tarihi
+Sika Viscocrete Hi-Tech 2541,TR16,19.74,07.10.2024
+Sika Viscocrete PC-15 TR dökme KG,TR16,26.90,07.10.2024
+Sika Viscocrete PC-61 Dökme,TR16,20.39,07.10.2024
+SİKARAPİD-1,TR16,23.35,10.10.2024
+SikaControl-13 AER TR 1000kgKONT,TR16,5.41,18.10.2024
+Plastocrete N TR 1000kgKONT,TR16,7.06,18.10.2024
+Plastocrete N TR Bidon,TR16,8.06,18.10.2024
+Antisol E-200 TR 200kgV,TR16,20.42,30.10.2024
+Antisol E-200 TR 1000kgKONT,TR16,18.44,30.10.2024
+Antisol E-200 25 Kg PB,TR16,26.28,30.10.2024
+Sika Viscocrete Hi-Tech 5876,TR16,10.05,30.11.2024
+Sika Viscocrete Hi-Tech 51,TR16,13.10,30.11.2024
+Sika Viscocrete Hi-Tech 6423,TR16,13.63,19.12.2024
+Sikatard 930 dökmeKG,TR16,20.97,20.01.2025
+Sika Viscocrete Hi-Tech 6235,TR16,15.45,15.04.2025
+Sika Viscocrete Hi-Tech 6329,TR16,12.95,15.04.2025
+Sika Viscocrete Hi-Tech 6351,TR16,18.59,15.04.2025
+Sigunit L 25,TR16,14.18,17.04.2025
+Sigunit L-25 E,TR16,12.99,17.04.2025
+Sigunit 5402 AF,TR16,8.64,17.04.2025
+Sigunit 5601 AF,TR16,9.61,17.04.2025
+SİKAMENT FNN,TR16,13.85,18.04.2025
+SIKA INTRAPLAST-Z (5 KG),TR16,26.36,18.04.2025
+SIKA RAPİD-5,TR16,12.94,18.04.2025
+Sikament RMC 1841,TR16,7.78,18.04.2025
+Sikament RMC 245S,TR16,8.88,18.04.2025
+Sika Viscocrete Hi-Tech 3798,TR16,13.19,24.04.2025
+Sika Viscocrete PC-65,TR16,20.74,25.04.2025
+Sika Viscocrete Hi-Tech 6160,TR16,12.49,25.04.2025
+Sika Viscocrete Hi-Tech 6018,TR16,11.48,25.04.2025
+Sika Viscocrete Hi-Tech 4156 S,TR16,14.50,25.04.2025
+Sika Viscocrete Hi-Tech 4156,TR16,14.88,25.04.2025
+Sika Viscocrete Hi-Tech 3619,TR16,9.74,25.04.2025
+Sika Viscocrete Hi-Tech 4808 S,TR16,13.60,25.04.2025
+Sika Viscocrete Hi-Tech 2928,TR16,9.52,25.04.2025
+Sika Viscocrete Hi-Tech 5473 sp,TR16,6.62,25.04.2025
+Sika Viscocrete PC-61,TR16,23.52,25.04.2025
+Sika Viscocrete Hi-Tech 2929,TR16,10.19,25.04.2025
+Sika Viscocrete Hi-Tech 5105 S,TR16,16.62,13.05.2025
+Sika Viscocrete Hi-Tech 5643,TR16,16.08,16.05.2025
+Sika Viscocrete Hi-Tech 6857,TR16,15.72,16.05.2025
+Sika Viscocrete Hi-Tech 6858,TR16,15.91,16.05.2025
+Sika Viscocrete Hi-Tech 3058,TR16,10.06,18.05.2025
+Sika Viscocrete Hi-Tech 4087 S,TR16,13.62,18.05.2025
+Sika Viscocrete Hi-Tech 4087 B,TR16,13.84,18.05.2025
+Sika Viscocrete Hi-Tech 5415,TR16,16.90,18.05.2025
+Sika Viscoflow 6377 Hi-Tech,TR15,9.66,18.05.2025
+Sika Viscocrete Hi-Tech 7220,TR16,7.64,18.05.2025
+Sika Viscocrete Hi-Tech 6351,TR16,18.77,18.05.2025
+Sika Viscocrete Hi-Tech 5958 S,TR16,15.61,18.05.2025
+Sika Viscocrete Hi-Tech 5252 S,TR16,17.05,18.05.2025
+Sika Viscocrete Hi-Tech 5718 EB,TR16,12.24,18.05.2025
+Sika Viscocrete Hi-Tech 6349,TR16,11.73,18.05.2025
+Sika Viscocrete Hi-Tech 5093,TR16,11.58,18.05.2025
+Sika Viscocrete Hi-Tech 5556 S,TR16,8.91,18.05.2025
+Sika Viscocrete Hi-Tech 4127,TR16,9.32,18.05.2025
+Sika Viscocrete Hi-Tech 5623,TR16,22.64,23.05.2025
+Konsantre Kalıp Yağı Bidon,TR16,54.89,27.05.2025
+Konsantre Kalıp Yağı Varil,TR16,51.99,27.05.2025
+Konsantre Kalıp Yağı IBC,TR16,49.79,27.05.2025
+Seperol S3 Kalıp Yağı Varil,TR16,54.30,27.05.2025
+Seperol S3 Kalıp Yağı Bidon,TR16,55.90,27.05.2025
+Seperol S3 Kalıp Yağı IBC,TR16,52.07,27.05.2025
+Sika Rapid-1 Bidon,TR16,30.11,27.05.2025
+Sika Rapid-5 Bidon,TR16,19.90,27.05.2025
+Sika Rapid 131R Bidon,TR16,27.78,27.05.2025
+Sikament 524,TR16,7.10,28.05.2025
+Sikament 524 N,TR16,5.10,28.05.2025
+Sikament 704,TR16,11.19,28.05.2025
+Sika Retarder 107,TR16,10.76,10.06.2025
+Sika Retarder Dökme,TR16,34.42,12.06.2025
+Sika Retarder IBC,TR16,36.63,12.06.2025
+Sika Retarder Varil,TR16,35.20,12.06.2025
+Sika Viscocrete Hi-Tech 6700,TR16,13.46,13.06.2025
+Sika Viscoflow 6506 Hi-Tech,TR16,9.34,18.06.2025
+Sika Viscocrete Hi-Tech 7171,TR16,11.21,18.06.2025
+Sika Viscocrete Hi-Tech 5915,TR16,8.20,18.06.2025
+Sika Viscocrete Hi-Tech 5349,TR16,6.78,20.06.2025
+Sika Viscocrete Hi-Tech 6329,TR16,13.33,23.06.2025
+Sika Viscocrete Hi-Tech 6852,TR16,12.35,23.06.2025
+Sika Viscoflow 6440 Hi-Tech,TR16,8.22,24.06.2025
+Sika Plastiment PZ 523 TR,TR16,9.20,30.06.2025
+Sika ViscoCrete SKY 4123 S,TR16,17.16,30.06.2025
+Sika Viscocrete SKY 3511,TR16,0.30,15.07.2025
+Sika Viscocrete Hi-Tech 7290,TR16,21.63,21.07.2025
+Sika Viscocrete Hi-Tech 6506,TR16,9.66,24.07.2025
+Sika Viscocrete Hi-Tech 44,TR16,10.28,28.07.2025
+Sika Viscocrete Hi-Tech 27,TR16,10.39,28.07.2025
+Sika Viscocrete GL 3113,TR15,11.56,13.08.2025
+Sika Viscocrete Hi-Tech 6574,TR16,11.61,18.08.2025
+Sika Viscocrete Hi-Tech 6574 S,TR15,11.95,13.08.2025
+Sika Viscocrete Hi-Tech 7196,TR15,18.77,28.08.2025
+Sika Viscocrete Hi-Tech 7196,TR16,17.62,28.08.2025
+Sika Viscocrete Hi-Tech 4087 B,TR16,15.18,27.08.2025
+Sika Viscocrete SKY 3580,TR16,11.65,20.08.2025
+Sika Viscocrete Hi-Tech 6934,TR16,14.45,08.08.2025
+Sika Viscocrete Hi-Tech 2541,TR16,22.05,13.08.2025
+Sika Paver HC-1,TR14,22.14,02.09.2025
+Sika Paver HC-110,TR16,23.39,02.09.2025
+Sika Viscocrete GL 3235,TR16,9.42,08.09.2025
+Sika Viscocrete GL 3235,TR15,9.74,08.09.2025
+Sika Viscocrete Hi-Tech 7116,TR16,21.73,05.09.2025
+Sika Viscocrete Hi-Tech 7116,TR15,22.91,05.09.2025
+Sika Viscocrete Hi-Tech 6574 S,TR15,11.95,08.09.2025
+Sika Viscocrete Hi-Tech 6574 S,TR16,11.61,08.09.2025
+Sika Viscoflow 6548 S Hi-Tech,TR15,13.92,05.09.2025
+Sika Viscoflow 6548 S Hi-Tech,TR16,13.30,05.09.2025
+Sika Viscoflow 6377 Hi-Tech,TR15,9.90,05.09.2025
+Sika Viscoflow 6377 Hi-Tech,TR16,9.36,05.09.2025
+Sika Viscocrete Hi-Tech 4087 S,TR15,15.18,05.09.2025
+Sika Viscocrete Hi-Tech 4087 S,TR16,13.49,05.09.2025
+Sika Viscocrete Hi-Tech 4087 B,TR16,15.18,26.08.2025
+Sika Viscocrete Hi-Tech 4087 B,TR16,13.46,26.08.2025
+Sika Viscocrete Hi-Tech 6763,TR16,13.38,08.09.2025
+Sika Viscocrete Hi-Tech 6763,TR15,13.99,08.09.2025
+Sika Viscocrete Hi-Tech 6574,TR16,11.61,01.10.2025
+SikaControl-1200 WT,TR16,12.00,17.10.2025
+SikaControl-1200 WT,TR15,14.90,17.10.2025
+Sika Viscocrete 6377 Hi-Tech,TR16,9.36,22.10.2025
+Sika Viscoflow 6440 Hi-Tech,TR16,8.22,22.10.2025
+Sika Viscocrete GL 3236,TR15,9.74,08.09.2025
+Sika Viscocrete Hi-Tech 7302,TR15,12.04,01.10.2025
+Sika Viscocrete Hi-Tech 7302,TR16,11.44,01.10.2025
+Sika Viscocrete Hi-Tech 6574,TR16,11.82,01.10.2025
+Sika Viscocrete Hi-Tech 7012,TR16,23.48,10.10.2025
+Sika Viscocrete Hi-Tech 7012,TR15,25.30,10.10.2025
+Sika Viscocrete Hi-Tech 6972,TR16,11.26,10.10.2025
+Sika Viscocrete Hi-Tech 6977,TR16,12.46,10.10.2025
+Sika Viscocrete Hi-Tech 6978,TR16,12.01,10.10.2025
+Sika Viscocrete Hi-Tech 4934,TR16,13.27,20.10.2025
+Sika Viscocrete Hi-Tech 4934,TR15,13.70,20.10.2025
+Sika Viscoflow 6377 Hi-Tech,TR15,11.46,20.10.2025
+Sika Viscoflow 6377 Hi-Tech,TR16,10.18,20.10.2025
+Sika Viscoflow 6505 Hi-Tech,TR16,10.31,03.11.2025
+Sika Viscoflow 6505 Hi-Tech,TR15,10.25,03.11.2025
+Sika Viscocrete Hi-Tech 6648,TR15,15.81,03.11.2025
+Sika Viscocrete Hi-Tech 6648,TR16,15.91,03.11.2025
+Sika Viscocrete Hi-Tech 6622,TR16,11.38,08.07.2025
+Sikament 524 RMC,TR15,10.72,20.08.2025
+Sikament 4350 RMC,TR15,9.05,20.08.2025
+Sikament MR 72 S,TR15,7.29,21.08.2025
+Sika Viscocrete Hi-Tech 3621,TR15,11.00,22.08.2025
+Sika Control 200 Aer,TR15,7.50,23.08.2025
+Sika Viscocrete Hi-Tech 2928,TR15,10.50,24.08.2025
+Sika Viscocrete Hi-Tech 3458 W,TR15,12.29,10.12.2025
+Sika Viscocrete Hi-Tech 3458 W,TR16,11.72,10.12.2025
+Sika Viscocrete Hi-Tech 3966,TR15,6.97,10.12.2025
+Sika Viscocrete Hi-Tech 3966,TR16,7.65,10.12.2025
+Sika PlastoÇrete N,TR15,6.62,10.12.2025
+Sika PlastoÇrete N,TR16,6.07,10.12.2025
