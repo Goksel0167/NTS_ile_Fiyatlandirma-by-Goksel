@@ -629,7 +629,11 @@ if page == "Fiyat Hesaplama":
             
             st.info(f"💸 Toplam Maliyet: {en_ucuz.get('Toplam_Maliyet_TL', 0):.2f} TL | Kar Marjı: %{st.session_state.get('kar_marji', 0):.1f}")
 
-            st.markdown("### 💰 Satış Fiyatı")
+            # GÜNCEL KURLARLA SATIŞ FİYATI
+            st.markdown("### 💰 Satış Fiyatı (GÜNCEL KURLAR)")
+            guncel_kur_tarihi = st.session_state.get('kullanilan_kurlar', kurlar).get('source_date', 'Bilinmiyor')
+            st.caption(f"📅 Kur Tarihi: {guncel_kur_tarihi}")
+            
             c1, c2, c3, c4 = st.columns(4)
 
             def show_price(col, baslik, simge, kur):
@@ -641,6 +645,44 @@ if page == "Fiyat Hesaplama":
             show_price(c2, "USD", "$", kurlar.get("USD", 36.50) or 36.50)
             show_price(c3, "EUR", "€", kurlar.get("EUR", 38.20) or 38.20)
             show_price(c4, "CHF", "₣", kurlar.get("CHF", 41.10) or 41.10)
+            
+            # ÜRÜN KAYIT TARİHİ KURLARIYLA SATIŞ FİYATI
+            if urun_kayit_kurlari:
+                st.markdown("---")
+                st.markdown("### 📊 Satış Fiyatı (ÜRÜN KAYIT TARİHİ KURLARI)")
+                st.caption(f"📅 Kur Tarihi: {urun_kayit_tarihi}")
+                
+                k1, k2, k3, k4 = st.columns(4)
+                
+                def show_price_kayit(col, baslik, simge, kur):
+                    deger = en_ucuz['Satis_TL'] / kur
+                    ton_fiyat = deger * 1000
+                    col.metric(baslik, f"{deger:.4f} {simge}/Kg", f"{ton_fiyat:,.0f} {simge}/Ton")
+                
+                show_price_kayit(k1, "TL", "₺", 1.0)
+                show_price_kayit(k2, "USD", "$", urun_kayit_kurlari.get("USD", 36.50) or 36.50)
+                show_price_kayit(k3, "EUR", "€", urun_kayit_kurlari.get("EUR", 38.20) or 38.20)
+                show_price_kayit(k4, "CHF", "₣", urun_kayit_kurlari.get("CHF", 41.10) or 41.10)
+                
+                # Fark hesaplama
+                st.markdown("---")
+                st.markdown("### 📈 Kur Farkı Etkisi")
+                fark_col1, fark_col2, fark_col3 = st.columns(3)
+                
+                guncel_usd = en_ucuz['Satis_TL'] / kurlar.get("USD", 36.50)
+                kayit_usd = en_ucuz['Satis_TL'] / urun_kayit_kurlari.get("USD", 36.50)
+                fark_usd = ((guncel_usd - kayit_usd) / kayit_usd * 100) if kayit_usd > 0 else 0
+                fark_col1.metric("USD Farkı", f"{fark_usd:+.2f}%", delta=f"{guncel_usd - kayit_usd:+.4f} $/Kg")
+                
+                guncel_eur = en_ucuz['Satis_TL'] / kurlar.get("EUR", 38.20)
+                kayit_eur = en_ucuz['Satis_TL'] / urun_kayit_kurlari.get("EUR", 38.20)
+                fark_eur = ((guncel_eur - kayit_eur) / kayit_eur * 100) if kayit_eur > 0 else 0
+                fark_col2.metric("EUR Farkı", f"{fark_eur:+.2f}%", delta=f"{guncel_eur - kayit_eur:+.4f} €/Kg")
+                
+                guncel_chf = en_ucuz['Satis_TL'] / kurlar.get("CHF", 41.10)
+                kayit_chf = en_ucuz['Satis_TL'] / urun_kayit_kurlari.get("CHF", 41.10)
+                fark_chf = ((guncel_chf - kayit_chf) / kayit_chf * 100) if kayit_chf > 0 else 0
+                fark_col3.metric("CHF Farkı", f"{fark_chf:+.2f}%", delta=f"{guncel_chf - kayit_chf:+.4f} ₣/Kg")
         else:
             st.warning("Bu şehir/ürün için NTS maliyeti olmayan fabrikalar mevcut. Fiyat hesaplanamadı.")
 
