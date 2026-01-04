@@ -558,6 +558,7 @@ if page == "Fiyat Hesaplama":
                         st.session_state['kullanilan_kurlar'] = kullanilan_kurlar
                         st.session_state['musteri_adi_kayit'] = musteri_adi_clean
                         st.session_state['urun_kayit_tarihi'] = urun_kayit_tarih.strftime('%Y-%m-%d') if urun_kayit_tarih is not None else None
+                        st.rerun()
                     else:
                         st.error("❌ Bu ürün veya şehir için veri bulunamadı!")
     
@@ -663,8 +664,11 @@ if page == "Fiyat Hesaplama":
                 min_val = df_sonuc.loc[df_sonuc['HasPrice'], 'Satis_TL'].min()
                 max_val = df_sonuc.loc[df_sonuc['HasPrice'], 'Satis_TL'].max()
 
-                # HasPrice bilgisini koruyarak display_df oluştur
-                display_df = df_sonuc[['Fabrika_Adi', 'Firma', 'Arac', 'NTS_TL', 'Nakliye_TL', 'Toplam_Maliyet_TL', 'Satis_TL', 'Satis_USD_KG', 'Satis_EUR_KG', 'Satis_CHF_KG', 'Satis_TL_TON', 'Satis_USD_TON', 'Satis_EUR_TON', 'Satis_CHF_TON', 'HasPrice']].copy()
+                # HasPrice bilgisini styling için df_sonuc'ta tut ama display_df'te gösterme
+                display_df = df_sonuc[['Fabrika_Adi', 'Firma', 'Arac', 'NTS_TL', 'Nakliye_TL', 'Toplam_Maliyet_TL', 'Satis_TL', 'Satis_USD_KG', 'Satis_EUR_KG', 'Satis_CHF_KG', 'Satis_TL_TON', 'Satis_USD_TON', 'Satis_EUR_TON', 'Satis_CHF_TON']].copy()
+                
+                # HasPrice bilgisini display_df'e ekle (styling için gerekli)
+                display_df['HasPrice'] = df_sonuc['HasPrice'].values
                 
                 def row_style(row):
                     if not row['HasPrice']:
@@ -685,10 +689,13 @@ if page == "Fiyat Hesaplama":
                     'Satis_USD_TON': lambda v: '-' if pd.isna(v) else f"${v:,.2f}",
                     'Satis_EUR_TON': lambda v: '-' if pd.isna(v) else f"€{v:,.2f}",
                     'Satis_CHF_TON': lambda v: '-' if pd.isna(v) else f"₣{v:,.2f}",
-                    'HasPrice': lambda v: ''
-                }).hide(axis='columns', subset=['HasPrice'])
+                })
+                
+                # HasPrice kolonunu gizle
+                final_display = display_df.drop(columns=['HasPrice'])
+                final_styled = styled_df.hide(subset=['HasPrice'], axis='columns')
 
-                st.dataframe(styled_df, use_container_width=True, hide_index=True)
+                st.dataframe(final_styled, use_container_width=True, hide_index=True)
 
                 if 'kullanilan_kurlar' in st.session_state:
                     kur_tarihi = st.session_state['kullanilan_kurlar'].get('source_date', st.session_state['kullanilan_kurlar'].get('date', 'Bilinmiyor'))
