@@ -1,3 +1,9 @@
 users.json
+pending_changes.json
+exchange_rates.json
+hesaplama_kayitlari.csv
 *.pyc
 __pycache__/
+.venv/
+.env
+.streamlit/
