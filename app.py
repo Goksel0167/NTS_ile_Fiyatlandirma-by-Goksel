@@ -681,38 +681,59 @@ if page == "Fiyat Hesaplama":
             if 'secili_fiyatlar' not in st.session_state:
                 st.session_state.secili_fiyatlar = {}
             
+            # Tüm fabrikaları göster
             for fabrika in ['TR14', 'TR15', 'TR16']:
-                fab_adi = {"TR14": "🟩 GEBZE", "TR15": "🟦 TRABZON", "TR16": "🟧 ADANA"}[fabrika]
-                st.markdown(f"**{fab_adi}**")
-                gecmis = get_all_product_prices(df_products, secili_urun, fabrika)
-                if not gecmis.empty:
-                    if len(gecmis) > 1:
-                        tarih_secenekleri = []
-                        for _, row in gecmis.iterrows():
+                fab_adi = {"TR14": "GEBZE", "TR15": "TRABZON", "TR16": "ADANA"}[fabrika]
+                fab_emoji = {"TR14": "🟩", "TR15": "🟦", "TR16": "🟧"}[fabrika]
+                
+                # Container ile her fabrikayı çerçevele
+                with st.container():
+                    st.markdown(f"### {fab_emoji} {fab_adi}")
+                    
+                    # Bu fabrika için tüm fiyatları getir
+                    gecmis = get_all_product_prices(df_products, secili_urun, fabrika)
+                    
+                    if not gecmis.empty:
+                        # Birden fazla fiyat varsa dropdown ile seçim
+                        if len(gecmis) > 1:
+                            st.info(f"📊 {len(gecmis)} adet fiyat kaydı bulundu")
+                            
+                            tarih_secenekleri = []
+                            for idx, row in gecmis.iterrows():
+                                tarih_str = row['Kayit_Tarihi'].strftime('%d.%m.%Y')
+                                fiyat = row['NTS_Maliyet_TL']
+                                tarih_secenekleri.append(f"{tarih_str} → {fiyat:.4f} TL/Kg")
+                            
+                            secili = st.selectbox(
+                                f"{fab_adi} Fiyat Seçimi",
+                                tarih_secenekleri,
+                                key=f"fiyat_sec_{fabrika}",
+                                help=f"{fab_adi} fabrikası için kullanılacak fiyatı seçin"
+                            )
+                            secili_index = tarih_secenekleri.index(secili)
+                            secili_fiyat = gecmis.iloc[secili_index]['NTS_Maliyet_TL']
+                            st.session_state.secili_fiyatlar[fabrika] = secili_fiyat
+                            st.success(f"✅ Seçili: **{secili_fiyat:.4f} TL/Kg**")
+                            
+                        # Tek fiyat varsa direkt göster
+                        else:
+                            row = gecmis.iloc[0]
                             tarih_str = row['Kayit_Tarihi'].strftime('%d.%m.%Y')
                             fiyat = row['NTS_Maliyet_TL']
-                            tarih_secenekleri.append(f"{tarih_str} - {fiyat:.2f} TL/Kg")
-                        
-                        secili = st.selectbox(
-                            "Fiyat Seç",
-                            tarih_secenekleri,
-                            key=f"fiyat_{fabrika}",
-                            label_visibility="collapsed"
-                        )
-                        secili_index = tarih_secenekleri.index(secili)
-                        st.session_state.secili_fiyatlar[fabrika] = gecmis.iloc[secili_index]['NTS_Maliyet_TL']
-                    else:
-                        for _, row in gecmis.iterrows():
-                            tarih_str = row['Kayit_Tarihi'].strftime('%d.%m.%Y')
-                            fiyat = row['NTS_Maliyet_TL']
-                            st.caption(f"• {tarih_str}: **{fiyat:.2f} TL/Kg**")
+                            st.success(f"💰 **{fiyat:.4f} TL/Kg**")
+                            st.caption(f"📅 Kayıt Tarihi: {tarih_str}")
                             st.session_state.secili_fiyatlar[fabrika] = fiyat
-                else:
-                    st.caption("• Fiyat kaydı yok: **-**")
-                    if fabrika in st.session_state.secili_fiyatlar:
-                        del st.session_state.secili_fiyatlar[fabrika]
+                    
+                    # Fiyat yoksa boş göster
+                    else:
+                        st.warning("❌ Fiyat kaydı bulunamadı")
+                        st.caption("Bu fabrikada henüz ürün fiyatı girilmemiş")
+                        if fabrika in st.session_state.secili_fiyatlar:
+                            del st.session_state.secili_fiyatlar[fabrika]
+                    
+                    st.markdown("---")
         else:
-            st.info("Lütfen ürün seçin")
+            st.info("👆 Lütfen önce bir ürün seçin")
     
     if 'hesaplama_yapildi' in st.session_state and st.session_state['hesaplama_yapildi']:
         st.markdown("---")
