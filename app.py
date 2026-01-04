@@ -623,7 +623,7 @@ if page == "Fiyat Hesaplama":
 
                 display_df = df_sonuc[['Fabrika_Adi', 'Firma', 'Arac', 'NTS_TL', 'Nakliye_TL', 'Toplam_Maliyet_TL', 'Satis_TL', 'Satis_USD_KG', 'Satis_EUR_KG', 'Satis_CHF_KG', 'Satis_TL_TON', 'Satis_USD_TON', 'Satis_EUR_TON', 'Satis_CHF_TON', 'HasPrice']]
 
-                styled_df = display_df.style.apply(row_style, axis=1).applymap(
+                styled_df = display_df.style.apply(row_style, axis=1).map(
                     lambda v: color_scale(v, min_val, max_val), subset=value_cols
                 ).format({
                     'NTS_TL': lambda v: '-' if pd.isna(v) else f"{v:.2f}",
