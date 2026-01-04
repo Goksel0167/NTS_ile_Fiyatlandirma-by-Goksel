@@ -691,37 +691,41 @@ if page == "Fiyat Hesaplama":
                     kur_usd = st.session_state['kullanilan_kurlar'].get('USD', 0)
                     st.caption(f"💱 Hesaplama Kur Tarihi: {kur_tarihi} | USD: {kur_usd:.4f} ₺")
 
-        if en_ucuz:
+        # Hesaplama kaydı butonu - session state'teki en_ucuz'u kullan
+        kayit_en_ucuz = st.session_state.get('en_ucuz')
+        if kayit_en_ucuz:
             if st.button("💾 Hesaplamayı Kaydet", type="primary"):
+                kayit_kurlar = st.session_state.get('kullanilan_kurlar', kurlar)
                 record = {
                     'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'username': st.session_state.username,
                     'musteri': st.session_state.get('musteri_adi_kayit', ''),
                     'urun': st.session_state.get('secili_urun', ''),
                     'sehir': st.session_state.get('secili_sehir', ''),
-                    'fabrika': en_ucuz['Fabrika'],
-                    'firma': en_ucuz['Firma'],
-                    'arac': en_ucuz['Arac'],
+                    'fabrika': kayit_en_ucuz['Fabrika'],
+                    'firma': kayit_en_ucuz['Firma'],
+                    'arac': kayit_en_ucuz['Arac'],
                     'kar_marji': st.session_state.get('kar_marji', 0),
-                    'nts_tl': en_ucuz.get('NTS_TL'),
-                    'nakliye_tl': en_ucuz.get('Nakliye_TL'),
-                    'toplam_maliyet_tl': en_ucuz.get('Toplam_Maliyet_TL'),
-                    'satis_tl_kg': en_ucuz.get('Satis_TL'),
-                    'satis_usd_kg': en_ucuz.get('Satis_TL') / kurlar.get('USD', 1),
-                    'satis_eur_kg': en_ucuz.get('Satis_TL') / kurlar.get('EUR', 1),
-                    'satis_chf_kg': en_ucuz.get('Satis_TL') / kurlar.get('CHF', 1),
-                    'satis_tl_ton': en_ucuz.get('Satis_TL') * 1000,
-                    'satis_usd_ton': (en_ucuz.get('Satis_TL') / kurlar.get('USD', 1)) * 1000,
-                    'satis_eur_ton': (en_ucuz.get('Satis_TL') / kurlar.get('EUR', 1)) * 1000,
-                    'satis_chf_ton': (en_ucuz.get('Satis_TL') / kurlar.get('CHF', 1)) * 1000,
-                    'usd_kur': kurlar.get('USD', 0),
-                    'eur_kur': kurlar.get('EUR', 0),
-                    'chf_kur': kurlar.get('CHF', 0),
-                    'kur_tarihi': kur_tarih,
-                    'urun_kayit_tarihi': urun_kayit_tarihi or ''
+                    'nts_tl': kayit_en_ucuz.get('NTS_TL'),
+                    'nakliye_tl': kayit_en_ucuz.get('Nakliye_TL'),
+                    'toplam_maliyet_tl': kayit_en_ucuz.get('Toplam_Maliyet_TL'),
+                    'satis_tl_kg': kayit_en_ucuz.get('Satis_TL'),
+                    'satis_usd_kg': kayit_en_ucuz.get('Satis_TL') / kayit_kurlar.get('USD', 1),
+                    'satis_eur_kg': kayit_en_ucuz.get('Satis_TL') / kayit_kurlar.get('EUR', 1),
+                    'satis_chf_kg': kayit_en_ucuz.get('Satis_TL') / kayit_kurlar.get('CHF', 1),
+                    'satis_tl_ton': kayit_en_ucuz.get('Satis_TL') * 1000,
+                    'satis_usd_ton': (kayit_en_ucuz.get('Satis_TL') / kayit_kurlar.get('USD', 1)) * 1000,
+                    'satis_eur_ton': (kayit_en_ucuz.get('Satis_TL') / kayit_kurlar.get('EUR', 1)) * 1000,
+                    'satis_chf_ton': (kayit_en_ucuz.get('Satis_TL') / kayit_kurlar.get('CHF', 1)) * 1000,
+                    'usd_kur': kayit_kurlar.get('USD', 0),
+                    'eur_kur': kayit_kurlar.get('EUR', 0),
+                    'chf_kur': kayit_kurlar.get('CHF', 0),
+                    'kur_tarihi': st.session_state.get('kullanilan_kurlar', {}).get('source_date', datetime.now().strftime('%Y-%m-%d')),
+                    'urun_kayit_tarihi': st.session_state.get('urun_kayit_tarihi', '')
                 }
                 append_calc_record(record)
                 st.success("📜 Hesaplama kaydedildi!")
+                st.balloons()
 
 # =========================================================
 # SAYFA 2: YENİ ÜRÜN EKLE
