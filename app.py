@@ -619,11 +619,14 @@ if page == "Fiyat Hesaplama":
 
         if en_ucuz:
             st.success("🏆 **EN UYGUN SEÇENEK**")
-            col1, col2, col3, col4 = st.columns(4)
+            col1, col2, col3, col4, col5 = st.columns(5)
             col1.metric("Fabrika", {"TR14": "GEBZE", "TR15": "TRABZON", "TR16": "ADANA"}.get(en_ucuz['Fabrika'], '-'))
             col2.metric("Firma", f"{en_ucuz['Firma']}")
             col3.metric("Araç", en_ucuz['Arac'])
             col4.metric("NTS Maliyet", f"{en_ucuz['NTS_TL']:.2f} TL")
+            col5.metric("Nakliye", f"{en_ucuz.get('Nakliye_TL', 0):.2f} TL")
+            
+            st.info(f"💸 Toplam Maliyet: {en_ucuz.get('Toplam_Maliyet_TL', 0):.2f} TL | Kar Marjı: %{st.session_state.get('kar_marji', 0):.1f}")
 
             st.markdown("### 💰 Satış Fiyatı")
             c1, c2, c3, c4 = st.columns(4)
@@ -665,9 +668,9 @@ if page == "Fiyat Hesaplama":
                         return ['background-color: #f0f0f0'] * len(row)
                     return [''] * len(row)
 
-                display_df = df_sonuc[['Fabrika_Adi', 'Firma', 'Arac', 'NTS_TL', 'Nakliye_TL', 'Toplam_Maliyet_TL', 'Satis_TL', 'Satis_USD_KG', 'Satis_EUR_KG', 'Satis_CHF_KG', 'Satis_TL_TON', 'Satis_USD_TON', 'Satis_EUR_TON', 'Satis_CHF_TON', 'HasPrice']]
+                display_df = df_sonuc[['Fabrika_Adi', 'Firma', 'Arac', 'NTS_TL', 'Nakliye_TL', 'Toplam_Maliyet_TL', 'Satis_TL', 'Satis_USD_KG', 'Satis_EUR_KG', 'Satis_CHF_KG', 'Satis_TL_TON', 'Satis_USD_TON', 'Satis_EUR_TON', 'Satis_CHF_TON']]
 
-                styled_df = display_df.style.apply(row_style, axis=1).map(
+                styled_df = display_df.style.apply(lambda row: row_style(df_sonuc.loc[row.name]), axis=1).map(
                     lambda v: color_scale(v, min_val, max_val), subset=value_cols
                 ).format({
                     'NTS_TL': lambda v: '-' if pd.isna(v) else f"{v:.2f}",
@@ -680,8 +683,7 @@ if page == "Fiyat Hesaplama":
                     'Satis_TL_TON': lambda v: '-' if pd.isna(v) else f"{v:,.2f} ₺",
                     'Satis_USD_TON': lambda v: '-' if pd.isna(v) else f"${v:,.2f}",
                     'Satis_EUR_TON': lambda v: '-' if pd.isna(v) else f"€{v:,.2f}",
-                    'Satis_CHF_TON': lambda v: '-' if pd.isna(v) else f"₣{v:,.2f}",
-                    'HasPrice': lambda v: ''
+                    'Satis_CHF_TON': lambda v: '-' if pd.isna(v) else f"₣{v:,.2f}"
                 })
 
                 st.dataframe(styled_df, use_container_width=True, hide_index=True)
