@@ -361,6 +361,8 @@ if 'username' not in st.session_state:
     st.session_state.username = None
 if 'musteri_adi' not in st.session_state:
     st.session_state.musteri_adi = ''
+if 'musteri_adi_kayit' not in st.session_state:
+    st.session_state.musteri_adi_kayit = ''
 
 # --- GİRİŞ SAYFASI ---
 if not st.session_state.logged_in:
@@ -517,6 +519,7 @@ if page == "Fiyat Hesaplama":
                 if not musteri_adi.strip():
                     st.error("❌ Müşteri adı zorunludur.")
                 else:
+                    musteri_adi_clean = musteri_adi.strip()
                     urun_kayit_tarih = None
                     urun_gecmis = df_products[df_products['Urun_Adi'] == secili_urun]
                     if not urun_gecmis.empty:
@@ -533,7 +536,7 @@ if page == "Fiyat Hesaplama":
                         st.session_state['secili_urun'] = secili_urun
                         st.session_state['secili_sehir'] = secili_sehir
                         st.session_state['kullanilan_kurlar'] = kullanilan_kurlar
-                        st.session_state['musteri_adi'] = musteri_adi.strip()
+                        st.session_state['musteri_adi_kayit'] = musteri_adi_clean
                         st.session_state['urun_kayit_tarihi'] = urun_kayit_tarih.strftime('%Y-%m-%d') if urun_kayit_tarih is not None else None
                     else:
                         st.error("❌ Bu ürün veya şehir için veri bulunamadı!")
@@ -649,7 +652,7 @@ if page == "Fiyat Hesaplama":
                 record = {
                     'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'username': st.session_state.username,
-                    'musteri': st.session_state.get('musteri_adi', ''),
+                    'musteri': st.session_state.get('musteri_adi_kayit', ''),
                     'urun': st.session_state.get('secili_urun', ''),
                     'sehir': st.session_state.get('secili_sehir', ''),
                     'fabrika': en_ucuz['Fabrika'],
