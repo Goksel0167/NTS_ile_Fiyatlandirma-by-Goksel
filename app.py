@@ -243,11 +243,20 @@ def get_latest_product_price(df_products, urun_adi, fabrika):
     latest = filtered.sort_values('Kayit_Tarihi', ascending=False).iloc[0]
     return latest['NTS_Maliyet_TL']
 
+
+def get_selected_product_price(df_products, urun_adi, fabrika, secili_fiyatlar):
+    """Kullanıcının seçtiği fiyatı döndür, yoksa en son fiyatı kullan"""
+    if fabrika in secili_fiyatlar:
+        return secili_fiyatlar[fabrika]
+    return get_latest_product_price(df_products, urun_adi, fabrika)
+
 def get_all_product_prices(df_products, urun_adi, fabrika):
     filtered = df_products[(df_products['Urun_Adi'] == urun_adi) & (df_products['Fabrika'] == fabrika)]
     return filtered.sort_values('Kayit_Tarihi', ascending=False)
 
-def find_cheapest_route(df_products, df_shipping, urun_adi, sehir, kar_marji, exchange_rates):
+def find_cheapest_route(df_products, df_shipping, urun_adi, sehir, kar_marji, exchange_rates, secili_fiyatlar=None):
+    if secili_fiyatlar is None:
+        secili_fiyatlar = {}
     calculated_rows = []
     display_rows = []
     usd_rate = exchange_rates.get('USD', 36.50) or 36.50
@@ -258,7 +267,7 @@ def find_cheapest_route(df_products, df_shipping, urun_adi, sehir, kar_marji, ex
     tum_fabrikalar = ['TR14', 'TR15', 'TR16']
 
     for fabrika in tum_fabrikalar:
-        nts_tl = get_latest_product_price(df_products, urun_adi, fabrika)
+        nts_tl = get_selected_product_price(df_products, urun_adi, fabrika, secili_fiyatlar)
         nakliye_options = ilgili_nakliye[ilgili_nakliye['Fabrika'] == fabrika]
 
         # Eğer nakliye kaydı yoksa bile satır ekle (boş gösterim)
@@ -536,7 +545,8 @@ if page == "Fiyat Hesaplama":
                         urun_kayit_tarih = urun_gecmis.sort_values('Kayit_Tarihi', ascending=False).iloc[0]['Kayit_Tarihi']
 
                     en_ucuz, tum_secenekler, kullanilan_kurlar = find_cheapest_route(
-                        df_products, df_shipping, secili_urun, secili_sehir, st.session_state.kar_marji, kurlar
+                        df_products, df_shipping, secili_urun, secili_sehir, st.session_state.kar_marji, kurlar,
+                        st.session_state.get('secili_fiyatlar', {})
                     )
                     
                     if tum_secenekler:
@@ -554,17 +564,39 @@ if page == "Fiyat Hesaplama":
     with col_right:
         st.subheader("📋 Ürün Geçmişi")
         if secili_urun:
+            if 'secili_fiyatlar' not in st.session_state:
+                st.session_state.secili_fiyatlar = {}
+            
             for fabrika in ['TR14', 'TR15', 'TR16']:
                 fab_adi = {"TR14": "🟩 GEBZE", "TR15": "🟦 TRABZON", "TR16": "🟧 ADANA"}[fabrika]
                 st.markdown(f"**{fab_adi}**")
                 gecmis = get_all_product_prices(df_products, secili_urun, fabrika)
                 if not gecmis.empty:
-                    for _, row in gecmis.iterrows():
-                        tarih_str = row['Kayit_Tarihi'].strftime('%d.%m.%Y')
-                        fiyat = row['NTS_Maliyet_TL']
-                        st.caption(f"• {tarih_str}: **{fiyat:.2f} TL/Kg**")
+                    if len(gecmis) > 1:
+                        tarih_secenekleri = []
+                        for _, row in gecmis.iterrows():
+                            tarih_str = row['Kayit_Tarihi'].strftime('%d.%m.%Y')
+                            fiyat = row['NTS_Maliyet_TL']
+                            tarih_secenekleri.append(f"{tarih_str} - {fiyat:.2f} TL/Kg")
+                        
+                        secili = st.selectbox(
+                            "Fiyat Seç",
+                            tarih_secenekleri,
+                            key=f"fiyat_{fabrika}",
+                            label_visibility="collapsed"
+                        )
+                        secili_index = tarih_secenekleri.index(secili)
+                        st.session_state.secili_fiyatlar[fabrika] = gecmis.iloc[secili_index]['NTS_Maliyet_TL']
+                    else:
+                        for _, row in gecmis.iterrows():
+                            tarih_str = row['Kayit_Tarihi'].strftime('%d.%m.%Y')
+                            fiyat = row['NTS_Maliyet_TL']
+                            st.caption(f"• {tarih_str}: **{fiyat:.2f} TL/Kg**")
+                            st.session_state.secili_fiyatlar[fabrika] = fiyat
                 else:
                     st.caption("• Fiyat kaydı yok: **-**")
+                    if fabrika in st.session_state.secili_fiyatlar:
+                        del st.session_state.secili_fiyatlar[fabrika]
         else:
             st.info("Lütfen ürün seçin")
     
