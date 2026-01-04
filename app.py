@@ -240,16 +240,37 @@ def get_all_product_prices(df_products, urun_adi, fabrika):
 def find_cheapest_route(df_products, df_shipping, urun_adi, sehir, kar_marji, exchange_rates):
     calculated_rows = []
     display_rows = []
-    usd_rate = exchange_rates.get('USD', 36.50)
-    eur_rate = exchange_rates.get('EUR', 38.20)
-    chf_rate = exchange_rates.get('CHF', 41.10)
+    usd_rate = exchange_rates.get('USD', 36.50) or 36.50
+    eur_rate = exchange_rates.get('EUR', 38.20) or 38.20
+    chf_rate = exchange_rates.get('CHF', 41.10) or 41.10
 
     ilgili_nakliye = df_shipping[(df_shipping['Sehir'] == sehir)]
-    urun_fabrikalari = ilgili_nakliye['Fabrika'].unique()
+    tum_fabrikalar = ['TR14', 'TR15', 'TR16']
 
-    for fabrika in urun_fabrikalari:
+    for fabrika in tum_fabrikalar:
         nts_tl = get_latest_product_price(df_products, urun_adi, fabrika)
         nakliye_options = ilgili_nakliye[ilgili_nakliye['Fabrika'] == fabrika]
+
+        # Eğer nakliye kaydı yoksa bile satır ekle (boş gösterim)
+        if nakliye_options.empty:
+            display_rows.append({
+                'Fabrika': fabrika,
+                'Firma': '-',
+                'Arac': '-',
+                'NTS_TL': nts_tl if nts_tl is not None else '-',
+                'Nakliye_TL': '-',
+                'Toplam_Maliyet_TL': '-',
+                'Satis_USD_KG': '-',
+                'Satis_EUR_KG': '-',
+                'Satis_CHF_KG': '-',
+                'Satis_TL_TON': '-',
+                'Satis_USD_TON': '-',
+                'Satis_EUR_TON': '-',
+                'Satis_CHF_TON': '-',
+                'Satis_TL': None,
+                'HasPrice': False
+            })
+            continue
 
         if nts_tl is None:
             for _, nakliye in nakliye_options.iterrows():
@@ -338,6 +359,8 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'username' not in st.session_state:
     st.session_state.username = None
+if 'musteri_adi' not in st.session_state:
+    st.session_state.musteri_adi = ''
 
 # --- GİRİŞ SAYFASI ---
 if not st.session_state.logged_in:
@@ -564,9 +587,9 @@ if page == "Fiyat Hesaplama":
                 col.metric(baslik, f"{deger:.4f} {simge}/Kg", f"{ton_fiyat:,.0f} {simge}/Ton")
 
             show_price(c1, "TL", "₺", 1.0)
-            show_price(c2, "USD", "$", kurlar["USD"])
-            show_price(c3, "EUR", "€", kurlar["EUR"])
-            show_price(c4, "CHF", "₣", kurlar["CHF"])
+            show_price(c2, "USD", "$", kurlar.get("USD", 36.50) or 36.50)
+            show_price(c3, "EUR", "€", kurlar.get("EUR", 38.20) or 38.20)
+            show_price(c4, "CHF", "₣", kurlar.get("CHF", 41.10) or 41.10)
         else:
             st.warning("Bu şehir/ürün için NTS maliyeti olmayan fabrikalar mevcut. Fiyat hesaplanamadı.")
 
