@@ -604,7 +604,7 @@ if page == "Fiyat Hesaplama":
                 df_sonuc = df_sonuc.sort_values(['HasPrice', 'Siralama'], ascending=[False, True])
 
                 def color_scale(val, min_val, max_val):
-                    if pd.isna(val) or max_val == min_val:
+                    if pd.isna(val) or not isinstance(val, (int, float)) or max_val == min_val:
                         return ''
                     normalized = (val - min_val) / (max_val - min_val)
                     r = int(144 + (255 - 144) * normalized)
