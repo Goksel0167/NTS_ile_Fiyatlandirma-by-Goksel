@@ -52,14 +52,19 @@ def save_tcmb_history(date_key, rates):
 
 def fetch_tcmb_for_date(date_obj):
     date_str = date_obj.strftime('%d%m%Y')
-    url = f"https://www.tcmb.gov.tr/kurlar/{date_str[:4]}{date_str[2:4]}/{date_str}.xml"
+    year = date_str[:4]
+    month = date_str[2:4]
+    url = f"https://www.tcmb.gov.tr/kurlar/{year}{month}/{date_str}.xml"
     try:
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, timeout=10)
     except Exception:
         return None
     if response.status_code != 200:
         return None
-    root = ET.fromstring(response.content)
+    try:
+        root = ET.fromstring(response.content)
+    except Exception:
+        return None
     rates = {}
     for currency in root.findall('Currency'):
         code = currency.get('CurrencyCode')
@@ -78,13 +83,18 @@ def fetch_tcmb_for_date(date_obj):
 def get_tcmb_rates():
     """TCMB'den güncel döviz satış kurlarını çek, gerekirse son 10 iş gününe kadar geriye git."""
     today = datetime.now().date()
-    for back in range(0, 10):
+    attempts = 0
+    for back in range(0, 15):  # 15 güne kadar geriye git
         candidate = today - timedelta(days=back)
         if candidate.weekday() >= 5:  # Hafta sonu ise atla
             continue
+        attempts += 1
+        if attempts > 10:  # Maksimum 10 iş günü dene
+            break
         fetched = fetch_tcmb_for_date(candidate)
         if fetched:
             fetched['is_fallback'] = back > 0
+            fetched['fallback_days'] = back
             save_exchange_rates(fetched)
             save_tcmb_history(candidate.strftime('%Y-%m-%d'), fetched)
             return fetched
@@ -545,14 +555,16 @@ if page == "Fiyat Hesaplama":
         st.subheader("📋 Ürün Geçmişi")
         if secili_urun:
             for fabrika in ['TR14', 'TR15', 'TR16']:
+                fab_adi = {"TR14": "🟩 GEBZE", "TR15": "🟦 TRABZON", "TR16": "🟧 ADANA"}[fabrika]
+                st.markdown(f"**{fab_adi}**")
                 gecmis = get_all_product_prices(df_products, secili_urun, fabrika)
                 if not gecmis.empty:
-                    fab_adi = {"TR14": "🟩 GEBZE", "TR15": "🟦 TRABZON", "TR16": "🟧 ADANA"}[fabrika]
-                    st.markdown(f"**{fab_adi}**")
                     for _, row in gecmis.iterrows():
                         tarih_str = row['Kayit_Tarihi'].strftime('%d.%m.%Y')
                         fiyat = row['NTS_Maliyet_TL']
                         st.caption(f"• {tarih_str}: **{fiyat:.2f} TL/Kg**")
+                else:
+                    st.caption("• Fiyat kaydı yok: **-**")
         else:
             st.info("Lütfen ürün seçin")
     
