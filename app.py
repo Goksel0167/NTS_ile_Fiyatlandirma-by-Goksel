@@ -254,7 +254,7 @@ def get_all_product_prices(df_products, urun_adi, fabrika):
     filtered = df_products[(df_products['Urun_Adi'] == urun_adi) & (df_products['Fabrika'] == fabrika)]
     return filtered.sort_values('Kayit_Tarihi', ascending=False)
 
-def find_cheapest_route(df_products, df_shipping, urun_adi, sehir, kar_marji, exchange_rates, secili_fiyatlar=None):
+def find_cheapest_route(df_products, df_shipping, urun_adi, sehir, kar_marji, exchange_rates, secili_fiyatlar=None, manuel_nakliye=None):
     if secili_fiyatlar is None:
         secili_fiyatlar = {}
     calculated_rows = []
@@ -265,6 +265,68 @@ def find_cheapest_route(df_products, df_shipping, urun_adi, sehir, kar_marji, ex
 
     ilgili_nakliye = df_shipping[(df_shipping['Sehir'] == sehir)]
     tum_fabrikalar = ['TR14', 'TR15', 'TR16']
+    
+    # Manuel nakliye seçimi varsa, sadece o seçeneği hesapla
+    if manuel_nakliye:
+        fabrika = manuel_nakliye['fabrika']
+        nts_tl = get_selected_product_price(df_products, urun_adi, fabrika, secili_fiyatlar)
+        
+        if nts_tl is not None:
+            nakliye_tl = manuel_nakliye['fiyat']
+            toplam_maliyet_tl = nts_tl + nakliye_tl
+            satis_tl = toplam_maliyet_tl * (1 + kar_marji / 100)
+            
+            satis_usd_kg = satis_tl / usd_rate
+            satis_eur_kg = satis_tl / eur_rate
+            satis_chf_kg = satis_tl / chf_rate
+            
+            manuel_row = {
+                'Fabrika': fabrika,
+                'Firma': manuel_nakliye['firma'],
+                'Arac': manuel_nakliye['arac'],
+                'NTS_TL': nts_tl,
+                'Nakliye_TL': nakliye_tl,
+                'Toplam_Maliyet_TL': toplam_maliyet_tl,
+                'Satis_USD_KG': satis_usd_kg,
+                'Satis_EUR_KG': satis_eur_kg,
+                'Satis_CHF_KG': satis_chf_kg,
+                'Satis_TL_TON': satis_tl * 1000,
+                'Satis_USD_TON': satis_usd_kg * 1000,
+                'Satis_EUR_TON': satis_eur_kg * 1000,
+                'Satis_CHF_TON': satis_chf_kg * 1000,
+                'Satis_TL': satis_tl,
+                'HasPrice': True
+            }
+            
+            # Tüm fabrikalar için display göster ama sadece seçili manuel hesaplama
+            for fab in tum_fabrikalar:
+                if fab == fabrika:
+                    display_rows.append(manuel_row)
+                    calculated_rows.append(manuel_row)
+                else:
+                    # Diğer fabrikalar için boş gösterim
+                    fab_nts = get_selected_product_price(df_products, urun_adi, fab, secili_fiyatlar)
+                    display_rows.append({
+                        'Fabrika': fab,
+                        'Firma': '-',
+                        'Arac': '-',
+                        'NTS_TL': fab_nts if fab_nts is not None else '-',
+                        'Nakliye_TL': '-',
+                        'Toplam_Maliyet_TL': '-',
+                        'Satis_USD_KG': '-',
+                        'Satis_EUR_KG': '-',
+                        'Satis_CHF_KG': '-',
+                        'Satis_TL_TON': '-',
+                        'Satis_USD_TON': '-',
+                        'Satis_EUR_TON': '-',
+                        'Satis_CHF_TON': '-',
+                        'Satis_TL': None,
+                        'HasPrice': False
+                    })
+            
+            return manuel_row, display_rows, exchange_rates
+
+    # Otomatik mod - tüm seçenekleri hesapla
 
     for fabrika in tum_fabrikalar:
         nts_tl = get_selected_product_price(df_products, urun_adi, fabrika, secili_fiyatlar)
@@ -526,6 +588,53 @@ if page == "Fiyat Hesaplama":
             sehir_listesi = sorted(df_shipping['Sehir'].unique())
             secili_sehir = st.selectbox("📍 Varış Şehri", sehir_listesi)
             
+            # Nakliye seçeneklerini göster
+            st.markdown("### 🚛 Nakliye Seçimi")
+            
+            # Seçili şehir için mevcut nakliye seçenekleri
+            sehir_nakliye = df_shipping[df_shipping['Sehir'] == secili_sehir].copy()
+            
+            if not sehir_nakliye.empty:
+                # Nakliye modu: Otomatik veya Manuel
+                nakliye_modu = st.radio("Nakliye Seçim Modu", 
+                                       ["🤖 Otomatik (En Ucuz)", "✋ Manuel Seçim"], 
+                                       key="nakliye_modu")
+                
+                if nakliye_modu == "✋ Manuel Seçim":
+                    st.info("💡 Nakliyeci, araç ve fiyatı kendiniz seçin")
+                    
+                    # Fabrika seçimi
+                    fabrika_listesi = sorted(sehir_nakliye['Fabrika'].unique().tolist())
+                    secili_fabrika = st.selectbox("🏭 Fabrika", fabrika_listesi, key="manuel_fabrika")
+                    
+                    # Seçili fabrika için firma listesi
+                    fabrika_nakliye = sehir_nakliye[sehir_nakliye['Fabrika'] == secili_fabrika]
+                    firma_listesi = sorted(fabrika_nakliye['Firma'].unique().tolist())
+                    secili_firma = st.selectbox("🚚 Nakliyeci Firma", firma_listesi, key="manuel_firma")
+                    
+                    # Seçili firma için araç listesi
+                    firma_arac = fabrika_nakliye[fabrika_nakliye['Firma'] == secili_firma]
+                    arac_listesi = sorted(firma_arac['Arac_Tipi'].unique().tolist())
+                    secili_arac = st.selectbox("🚗 Araç Tipi", arac_listesi, key="manuel_arac")
+                    
+                    # Seçili kombinasyonun fiyatını göster
+                    secili_nakliye = firma_arac[firma_arac['Arac_Tipi'] == secili_arac]
+                    if not secili_nakliye.empty:
+                        nakliye_fiyat = secili_nakliye.iloc[0]['Fiyat_TL_KG']
+                        st.success(f"📦 Nakliye Fiyatı: **{nakliye_fiyat:.4f} TL/Kg**")
+                        
+                        # Manuel seçimleri session state'e kaydet
+                        st.session_state['manuel_nakliye'] = {
+                            'fabrika': secili_fabrika,
+                            'firma': secili_firma,
+                            'arac': secili_arac,
+                            'fiyat': nakliye_fiyat
+                        }
+                else:
+                    # Otomatik mod - manuel seçimi temizle
+                    if 'manuel_nakliye' in st.session_state:
+                        del st.session_state['manuel_nakliye']
+            
             st.markdown("### 📈 Kâr Marjı")
             if 'kar_marji' not in st.session_state:
                 st.session_state.kar_marji = 30.0
@@ -544,9 +653,13 @@ if page == "Fiyat Hesaplama":
                     if not urun_gecmis.empty:
                         urun_kayit_tarih = urun_gecmis.sort_values('Kayit_Tarihi', ascending=False).iloc[0]['Kayit_Tarihi']
 
+                    # Manuel nakliye seçimi varsa kullan
+                    manuel_nakliye = st.session_state.get('manuel_nakliye')
+                    
                     en_ucuz, tum_secenekler, kullanilan_kurlar = find_cheapest_route(
                         df_products, df_shipping, secili_urun, secili_sehir, st.session_state.kar_marji, kurlar,
-                        st.session_state.get('secili_fiyatlar', {})
+                        st.session_state.get('secili_fiyatlar', {}),
+                        manuel_nakliye
                     )
                     
                     if tum_secenekler:
