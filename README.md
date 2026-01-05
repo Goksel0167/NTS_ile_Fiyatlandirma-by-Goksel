@@ -73,7 +73,7 @@ Bu projeyi kendi bilgisayarınızda geliştirmek isterseniz:
 ## 🌐 Canlı Kullanım
 
 Uygulama Streamlit Cloud üzerinde 7/24 aktiftir:
-**https://ntsproje-by-goksel.streamlit.app/**
+**https://ntsilefiyatlandirma-by-goksel.streamlit.app/**
 
 
 
