@@ -1,9 +1,56 @@
+# Kullanıcı verileri ve hassas bilgiler
 users.json
+bayi_musterileri.json
 pending_changes.json
 exchange_rates.json
 hesaplama_kayitlari.csv
+hesaplama_gecmisi.csv
+nts-projesi-433142374ba8.json
+
+# Python
 *.pyc
 __pycache__/
 .venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Ortam değişkenleri
 .env
 .streamlit/
+.streamlit/secrets.toml
+
+# Log dosyaları
+logs/
+*.log
+nts_service.pid
+
+# Veritabanı yedekleri
+*_yedek.csv
+*_backup.csv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Geçici dosyalar
+*.tmp
+*.temp
+
+# Flutter
+flutter_app/.dart_tool/
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+flutter_app/.packages
+flutter_app/build/
+
+# TCMB kur cache
+tcmb_kur_gecmisi.json

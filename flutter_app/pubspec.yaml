@@ -1,0 +1,40 @@
+name: nts_mobil
+description: NTS & Lojistik Maliyet Analiz Mobil Uygulaması
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # HTTP istekleri için
+  http: ^1.2.0
+  
+  # State management
+  provider: ^6.1.1
+  
+  # JSON işlemleri
+  json_annotation: ^4.8.1
+  
+  # Loading ve dialog
+  flutter_spinkit: ^5.2.0
+  
+  # Responsive design
+  flutter_screenutil: ^5.9.0
+  
+  # İkonlar
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  
+  flutter_lints: ^4.0.0
+  json_serializable: ^6.7.1
+  build_runner: ^2.4.8
+
+flutter:
+  uses-material-design: true

@@ -80,12 +80,24 @@ def fetch_tcmb_for_date(date_obj):
     return rates
 
 
-def get_tcmb_rates():
-    """TCMB'den güncel döviz satış kurlarını çek, gerekirse son 10 iş gününe kadar geriye git."""
-    today = datetime.now().date()
+def get_tcmb_rates(target_date=None):
+    """
+    TCMB'den döviz satış kurlarını çek.
+    
+    Args:
+        target_date: datetime.date veya None. None ise bugünün tarihi kullanılır.
+    
+    Returns:
+        dict: Kurlar ve tarih bilgisi
+    """
+    if target_date is None:
+        target_date = datetime.now().date()
+    elif isinstance(target_date, datetime):
+        target_date = target_date.date()
+    
     attempts = 0
     for back in range(0, 15):  # 15 güne kadar geriye git
-        candidate = today - timedelta(days=back)
+        candidate = target_date - timedelta(days=back)
         if candidate.weekday() >= 5:  # Hafta sonu ise atla
             continue
         attempts += 1
@@ -95,6 +107,9 @@ def get_tcmb_rates():
         if fetched:
             fetched['is_fallback'] = back > 0
             fetched['fallback_days'] = back
+            fetched['target_date'] = target_date.strftime('%Y-%m-%d')
+            if back > 0:
+                fetched['used_date'] = candidate.strftime('%Y-%m-%d')
             save_exchange_rates(fetched)
             save_tcmb_history(candidate.strftime('%Y-%m-%d'), fetched)
             return fetched
@@ -424,14 +439,25 @@ def find_cheapest_route(df_products, df_shipping, urun_adi, sehir, kar_marji, ex
 
     return en_ucuz, display_rows, exchange_rates
 
-def save_new_product(urun_adi, fabrika, nts_maliyet, tarih):
+def save_new_product(urun_adi, fabrika, nts_maliyet, tarih, para_birimi='TL', giris_fiyat=None, kur_usd=None, kur_eur=None, kur_chf=None, kur_tarihi=None):
+    """Ürün kaydını genişletilmiş bilgilerle kaydet"""
     df = load_products()
-    new_row = pd.DataFrame([{
+    
+    # Yeni kayıt
+    new_row_data = {
         'Urun_Adi': urun_adi,
         'Fabrika': fabrika,
         'NTS_Maliyet_TL': nts_maliyet,
-        'Kayit_Tarihi': tarih.strftime('%d.%m.%Y')
-    }])
+        'Giris_Para_Birimi': para_birimi,
+        'Giris_Fiyat': giris_fiyat if giris_fiyat is not None else nts_maliyet,
+        'Kayit_Tarihi': tarih.strftime('%d.%m.%Y'),
+        'Kur_USD': kur_usd if kur_usd is not None else '',
+        'Kur_EUR': kur_eur if kur_eur is not None else '',
+        'Kur_CHF': kur_chf if kur_chf is not None else '',
+        'Kur_Tarihi': kur_tarihi if kur_tarihi else ''
+    }
+    
+    new_row = pd.DataFrame([new_row_data])
     df = pd.concat([df, new_row], ignore_index=True)
     df.to_csv(PRODUCT_FILE, index=False)
 
@@ -553,7 +579,7 @@ with st.sidebar:
     st.title("📊 NTS Mobil v7.5")
     st.caption(f"👤 Kullanıcı: **{st.session_state.username}**")
     st.caption(f"🏢 Proje Sahibi / Yönetici: **{OWNER_NAME} ({ADMIN_USERNAME})**")
-    page = st.radio("🔀 Menü", ["Fiyat Hesaplama", "Yeni Ürün Ekle", "📈 Ürün Fiyat Artışı", "Lojistik Fiyat Güncelleme", "📜 Hesaplama Geçmişi"])
+    page = st.radio("🔀 Menü", ["Fiyat Hesaplama", "Yeni Ürün Ekle", "📈 Ürün Fiyat Artışı", "Lojistik Fiyat Güncelleme", "� Bayi Müşteri Yönetimi", "�📜 Hesaplama Geçmişi"])
     st.markdown("---")
     if st.button("🚪 Çıkış Yap"):
         st.session_state.logged_in = False
@@ -579,7 +605,38 @@ if page == "Fiyat Hesaplama":
     
     with col_left:
         st.subheader("🔧 Seçimler")
-        musteri_adi = st.text_input("👤 Müşteri Adı (zorunlu)", key="musteri_adi")
+        
+        # 1. Müşteri Adı (Ana Müşteri / Bayi)
+        musteri_adi = st.text_input("👤 Müşteri Adı (Bayi) - Zorunlu", key="musteri_adi", placeholder="Örn: ABC İnşaat Ltd.")
+        
+        # 2. Bayi Müşteri Seçimi
+        st.markdown("#### 🏢 Bayi Müşteri Seçimi")
+        BAYI_MUSTERI_FILE = "bayi_musterileri.json"
+        bayi_musteri_adi = ""
+        
+        if os.path.exists(BAYI_MUSTERI_FILE):
+            with open(BAYI_MUSTERI_FILE, 'r', encoding='utf-8') as f:
+                bayi_musteriler = json.load(f)
+            
+            current_user = st.session_state.username
+            if current_user in bayi_musteriler and bayi_musteriler[current_user]:
+                col_bayi1, col_bayi2 = st.columns([1, 1])
+                with col_bayi1:
+                    musteri_listesi = ["Manuel Giriş"] + [m['adi'] for m in bayi_musteriler[current_user]]
+                    musteri_secim = st.selectbox("📋 Kayıtlı Müşterilerden Seç", musteri_listesi, key="musteri_sec")
+                
+                with col_bayi2:
+                    if musteri_secim == "Manuel Giriş":
+                        bayi_musteri_adi = st.text_input("✍️ Bayi Müşteri Adı", key="bayi_musteri_manuel", placeholder="Örn: XYZ Yapı A.Ş.")
+                    else:
+                        bayi_musteri_adi = musteri_secim
+                        st.text_input("✅ Seçili Müşteri", value=musteri_secim, key="bayi_musteri_selected", disabled=True)
+            else:
+                bayi_musteri_adi = st.text_input("🏢 Bayi Müşteri Adı (Opsiyonel)", key="bayi_musteri_adi", placeholder="Örn: DEF Proje Ltd.")
+        else:
+            bayi_musteri_adi = st.text_input("🏢 Bayi Müşteri Adı (Opsiyonel)", key="bayi_musteri_adi", placeholder="Örn: DEF Proje Ltd.")
+        
+        st.markdown("---")
         
         urun_listesi = [''] + sorted(df_products['Urun_Adi'].unique().tolist())
         secili_urun = st.selectbox("🔹 Ürün Seçin", urun_listesi, index=0)
@@ -670,7 +727,11 @@ if page == "Fiyat Hesaplama":
                         st.session_state['secili_sehir'] = secili_sehir
                         st.session_state['kullanilan_kurlar'] = kullanilan_kurlar
                         st.session_state['musteri_adi_kayit'] = musteri_adi_clean
-                        st.session_state['urun_kayit_tarihi'] = urun_kayit_tarih.strftime('%Y-%m-%d') if urun_kayit_tarih is not None else None
+                        st.session_state['bayi_musteri_kayit'] = bayi_musteri_adi.strip() if bayi_musteri_adi else ""
+                        try:
+                            st.session_state['urun_kayit_tarihi'] = urun_kayit_tarih.strftime('%Y-%m-%d') if urun_kayit_tarih is not None and pd.notna(urun_kayit_tarih) else None
+                        except:
+                            st.session_state['urun_kayit_tarihi'] = None
                         st.rerun()
                     else:
                         st.error("❌ Bu ürün veya şehir için veri bulunamadı!")
@@ -700,7 +761,10 @@ if page == "Fiyat Hesaplama":
                             
                             tarih_secenekleri = []
                             for idx, row in gecmis.iterrows():
-                                tarih_str = row['Kayit_Tarihi'].strftime('%d.%m.%Y')
+                                try:
+                                    tarih_str = row['Kayit_Tarihi'].strftime('%d.%m.%Y') if pd.notna(row['Kayit_Tarihi']) else 'Tarih Yok'
+                                except:
+                                    tarih_str = 'Tarih Yok'
                                 fiyat = row['NTS_Maliyet_TL']
                                 tarih_secenekleri.append(f"{tarih_str} → {fiyat:.4f} TL/Kg")
                             
@@ -718,7 +782,10 @@ if page == "Fiyat Hesaplama":
                         # Tek fiyat varsa direkt göster
                         else:
                             row = gecmis.iloc[0]
-                            tarih_str = row['Kayit_Tarihi'].strftime('%d.%m.%Y')
+                            try:
+                                tarih_str = row['Kayit_Tarihi'].strftime('%d.%m.%Y') if pd.notna(row['Kayit_Tarihi']) else 'Tarih Yok'
+                            except:
+                                tarih_str = 'Tarih Yok'
                             fiyat = row['NTS_Maliyet_TL']
                             st.success(f"💰 **{fiyat:.4f} TL/Kg**")
                             st.caption(f"📅 Kayıt Tarihi: {tarih_str}")
@@ -737,158 +804,115 @@ if page == "Fiyat Hesaplama":
     
     if 'hesaplama_yapildi' in st.session_state and st.session_state['hesaplama_yapildi']:
         st.markdown("---")
-        st.subheader("✅ HESAPLAMA SONUÇLARI")
+        st.markdown("## 📊 DETAYLI FİYAT KARŞILAŞTIRMA TABLOSU")
 
         en_ucuz = st.session_state['en_ucuz']
         tum_secenekler = st.session_state['tum_secenekler']
-        urun_kayit_tarihi = st.session_state.get('urun_kayit_tarihi')
-        urun_kayit_dt = datetime.strptime(urun_kayit_tarihi, '%Y-%m-%d').date() if urun_kayit_tarihi else None
-        urun_kayit_kurlari = get_rates_for_date(urun_kayit_dt) if urun_kayit_dt else None
-
-        if urun_kayit_tarihi:
-            st.info(f"Ürün son kayıt tarihi: {urun_kayit_tarihi}")
-            if urun_kayit_kurlari:
-                st.caption(f"Kayıt tarihindeki kurlar → USD: {urun_kayit_kurlari.get('USD', 0):.4f} ₺ | EUR: {urun_kayit_kurlari.get('EUR', 0):.4f} ₺ | CHF: {urun_kayit_kurlari.get('CHF', 0):.4f} ₺")
-            else:
-                st.warning("Kayıt tarihi için kur bulunamadı; güncel kurlar gösterildi.")
+        kullanilan_kurlar = st.session_state.get('kullanilan_kurlar', kurlar)
+        
+        # Döviz kurları
+        usd_kur = kullanilan_kurlar.get('USD', 36.50) or 36.50
+        eur_kur = kullanilan_kurlar.get('EUR', 38.20) or 38.20
+        chf_kur = kullanilan_kurlar.get('CHF', 41.10) or 41.10
+        kur_tarihi = kullanilan_kurlar.get('source_date', 'Bilinmiyor')
+        
+        # Kur bilgisi
+        st.info(f"💱 Döviz Kurları (Tarih: {kur_tarihi}) → USD: {usd_kur:.4f} ₺ | EUR: {eur_kur:.4f} ₺ | CHF: {chf_kur:.4f} ₺ | Kar Marjı: %{st.session_state.get('kar_marji', 0):.1f}")
 
         if en_ucuz:
+            # EN UCUZ SEÇENEK VURGUSU
             st.success("🏆 **EN UYGUN SEÇENEK**")
-            col1, col2, col3, col4, col5 = st.columns(5)
-            col1.metric("Fabrika", {"TR14": "GEBZE", "TR15": "TRABZON", "TR16": "ADANA"}.get(en_ucuz['Fabrika'], '-'))
-            col2.metric("Firma", f"{en_ucuz['Firma']}")
-            col3.metric("Araç", en_ucuz['Arac'])
-            col4.metric("NTS Maliyet", f"{en_ucuz['NTS_TL']:.2f} TL")
-            col5.metric("Nakliye", f"{en_ucuz.get('Nakliye_TL', 0):.2f} TL")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Fabrika", {"TR14": "GEBZE", "TR15": "TRABZON", "TR16": "ADANA"}.get(en_ucuz['Fabrika'], '-'))
+                st.metric("Firma", f"{en_ucuz['Firma']}")
+                st.metric("Araç", en_ucuz['Arac'])
             
-            st.info(f"💸 Toplam Maliyet: {en_ucuz.get('Toplam_Maliyet_TL', 0):.2f} TL | Kar Marjı: %{st.session_state.get('kar_marji', 0):.1f}")
-
-            # GÜNCEL KURLARLA SATIŞ FİYATI
-            st.markdown("### 💰 Satış Fiyatı (GÜNCEL KURLAR)")
-            guncel_kur_tarihi = st.session_state.get('kullanilan_kurlar', kurlar).get('source_date', 'Bilinmiyor')
-            st.caption(f"📅 Kur Tarihi: {guncel_kur_tarihi}")
+            with col2:
+                st.markdown("**💰 Maliyet**")
+                st.metric("NTS", f"{en_ucuz['NTS_TL']:.2f} ₺/Kg")
+                st.metric("Nakliye", f"{en_ucuz.get('Nakliye_TL', 0):.2f} ₺/Kg")
+                st.metric("**Toplam**", f"**{en_ucuz.get('Toplam_Maliyet_TL', 0):.2f} ₺/Kg**")
             
-            c1, c2, c3, c4 = st.columns(4)
-
-            def show_price(col, baslik, simge, kur):
-                deger = en_ucuz['Satis_TL'] / kur
-                ton_fiyat = deger * 1000
-                col.metric(baslik, f"{deger:.4f} {simge}/Kg", f"{ton_fiyat:,.0f} {simge}/Ton")
-
-            show_price(c1, "TL", "₺", 1.0)
-            show_price(c2, "USD", "$", kurlar.get("USD", 36.50) or 36.50)
-            show_price(c3, "EUR", "€", kurlar.get("EUR", 38.20) or 38.20)
-            show_price(c4, "CHF", "₣", kurlar.get("CHF", 41.10) or 41.10)
+            with col3:
+                st.markdown("**📦 Satış Fiyatı (Birim)**")
+                st.metric("TL/Kg", f"{en_ucuz['Satis_TL']:.2f} ₺")
+                st.metric("USD/Kg", f"${en_ucuz['Satis_USD_KG']:.4f}")
+                st.metric("EUR/Kg", f"€{en_ucuz['Satis_EUR_KG']:.4f}")
+                st.metric("CHF/Kg", f"₣{en_ucuz['Satis_CHF_KG']:.4f}")
             
-            # ÜRÜN KAYIT TARİHİ KURLARIYLA SATIŞ FİYATI
-            if urun_kayit_kurlari:
-                st.markdown("---")
-                st.markdown("### 📊 Satış Fiyatı (ÜRÜN KAYIT TARİHİ KURLARI)")
-                st.caption(f"📅 Kur Tarihi: {urun_kayit_tarihi}")
-                
-                k1, k2, k3, k4 = st.columns(4)
-                
-                def show_price_kayit(col, baslik, simge, kur):
-                    deger = en_ucuz['Satis_TL'] / kur
-                    ton_fiyat = deger * 1000
-                    col.metric(baslik, f"{deger:.4f} {simge}/Kg", f"{ton_fiyat:,.0f} {simge}/Ton")
-                
-                show_price_kayit(k1, "TL", "₺", 1.0)
-                show_price_kayit(k2, "USD", "$", urun_kayit_kurlari.get("USD", 36.50) or 36.50)
-                show_price_kayit(k3, "EUR", "€", urun_kayit_kurlari.get("EUR", 38.20) or 38.20)
-                show_price_kayit(k4, "CHF", "₣", urun_kayit_kurlari.get("CHF", 41.10) or 41.10)
-                
-                # Fark hesaplama
-                st.markdown("---")
-                st.markdown("### 📈 Kur Farkı Etkisi")
-                fark_col1, fark_col2, fark_col3 = st.columns(3)
-                
-                guncel_usd = en_ucuz['Satis_TL'] / kurlar.get("USD", 36.50)
-                kayit_usd = en_ucuz['Satis_TL'] / urun_kayit_kurlari.get("USD", 36.50)
-                fark_usd = ((guncel_usd - kayit_usd) / kayit_usd * 100) if kayit_usd > 0 else 0
-                fark_col1.metric("USD Farkı", f"{fark_usd:+.2f}%", delta=f"{guncel_usd - kayit_usd:+.4f} $/Kg")
-                
-                guncel_eur = en_ucuz['Satis_TL'] / kurlar.get("EUR", 38.20)
-                kayit_eur = en_ucuz['Satis_TL'] / urun_kayit_kurlari.get("EUR", 38.20)
-                fark_eur = ((guncel_eur - kayit_eur) / kayit_eur * 100) if kayit_eur > 0 else 0
-                fark_col2.metric("EUR Farkı", f"{fark_eur:+.2f}%", delta=f"{guncel_eur - kayit_eur:+.4f} €/Kg")
-                
-                guncel_chf = en_ucuz['Satis_TL'] / kurlar.get("CHF", 41.10)
-                kayit_chf = en_ucuz['Satis_TL'] / urun_kayit_kurlari.get("CHF", 41.10)
-                fark_chf = ((guncel_chf - kayit_chf) / kayit_chf * 100) if kayit_chf > 0 else 0
-                fark_col3.metric("CHF Farkı", f"{fark_chf:+.2f}%", delta=f"{guncel_chf - kayit_chf:+.4f} ₣/Kg")
-        else:
-            st.warning("Bu şehir/ürün için NTS maliyeti olmayan fabrikalar mevcut. Fiyat hesaplanamadı.")
-
-        with st.expander("🔍 Tüm Fabrika & Nakliye Seçenekleri"):
-            df_sonuc = pd.DataFrame(tum_secenekler)
+            st.markdown("---")
+        
+        # TÜM FABRİKALARIN FİYATLARINI GÖSTER
+        st.markdown("### 🏭 Tüm Fabrikalar İçin Fiyat Karşılaştırması")
+        st.caption(f"Ürün: **{st.session_state.get('secili_urun')}** | Varış Şehri: **{st.session_state.get('secili_sehir')}**")
+        
+        df_sonuc = pd.DataFrame(tum_secenekler)
+        
+        if not df_sonuc.empty:
+            # Sadece fiyatı olan kayıtları al
+            df_sonuc = df_sonuc[df_sonuc['Satis_TL'].notna()]
+            
             if not df_sonuc.empty:
-                df_sonuc['Fabrika_Adi'] = df_sonuc['Fabrika'].map({"TR14": "GEBZE", "TR15": "TRABZON", "TR16": "ADANA"})
-                df_sonuc['Siralama'] = df_sonuc.apply(lambda r: r['Satis_TL'] if r['HasPrice'] else float('inf'), axis=1)
-                df_sonuc = df_sonuc.sort_values(['HasPrice', 'Siralama'], ascending=[False, True])
-
-                def color_scale(val, min_val, max_val):
-                    if pd.isna(val) or not isinstance(val, (int, float)) or max_val == min_val:
-                        return ''
-                    normalized = (val - min_val) / (max_val - min_val)
-                    r = int(144 + (255 - 144) * normalized)
-                    g = int(238 - (238 - 182) * normalized)
-                    b = int(144 - (144 - 198) * normalized)
-                    return f'background-color: rgb({r}, {g}, {b})'
-
-                value_cols = ['Toplam_Maliyet_TL', 'Satis_USD_KG', 'Satis_EUR_KG', 'Satis_CHF_KG', 'Satis_TL_TON', 'Satis_USD_TON', 'Satis_EUR_TON', 'Satis_CHF_TON']
-                min_val = df_sonuc.loc[df_sonuc['HasPrice'], 'Satis_TL'].min()
-                max_val = df_sonuc.loc[df_sonuc['HasPrice'], 'Satis_TL'].max()
-
-                # HasPrice bilgisini styling için df_sonuc'ta tut ama display_df'te gösterme
-                display_df = df_sonuc[['Fabrika_Adi', 'Firma', 'Arac', 'NTS_TL', 'Nakliye_TL', 'Toplam_Maliyet_TL', 'Satis_TL', 'Satis_USD_KG', 'Satis_EUR_KG', 'Satis_CHF_KG', 'Satis_TL_TON', 'Satis_USD_TON', 'Satis_EUR_TON', 'Satis_CHF_TON']].copy()
+                # Fabrika bazında gruplama
+                fabrika_isimleri = {"TR14": "🟩 GEBZE", "TR15": "🟦 TRABZON", "TR16": "🟧 ADANA"}
                 
-                # HasPrice bilgisini display_df'e ekle (styling için gerekli)
-                display_df['HasPrice'] = df_sonuc['HasPrice'].values
-                
-                def row_style(row):
-                    if not row['HasPrice']:
-                        return ['background-color: #f0f0f0'] * len(row)
-                    return [''] * len(row)
+                for fabrika_kod in df_sonuc['Fabrika'].unique():
+                    fab_data = df_sonuc[df_sonuc['Fabrika'] == fabrika_kod].copy()
+                    
+                    if not fab_data.empty:
+                        with st.expander(f"{fabrika_isimleri.get(fabrika_kod, fabrika_kod)} - {len(fab_data)} nakliye seçeneği", expanded=True):
+                            
+                            # En ucuz bu fabrikadan
+                            en_ucuz_fab = fab_data.loc[fab_data['Satis_TL'].idxmin()]
+                            
+                            st.info(f"💰 **En Ucuz Nakliye:** {en_ucuz_fab['Firma']} ({en_ucuz_fab['Arac']}) → **{en_ucuz_fab['Satis_TL']:.2f} ₺/Kg**")
+                            
+                            # Tablo için hazırlık
+                            display_fab = fab_data[['Firma', 'Arac', 'NTS_TL', 'Nakliye_TL', 'Toplam_Maliyet_TL', 'Satis_TL', 'Satis_USD_KG', 'Satis_EUR_KG', 'Satis_CHF_KG']].copy()
+                            
+                            # Kolon isimlerini değiştir
+                            display_fab.columns = ['Nakliye Firması', 'Araç Tipi', 'NTS (₺/Kg)', 'Nakliye (₺/Kg)', 'Toplam Maliyet (₺/Kg)', 'Satış TL/Kg', 'Satış $/Kg', 'Satış €/Kg', 'Satış ₣/Kg']
+                            
+                            # En ucuz satırı vurgula
+                            def highlight_min(s):
+                                is_min = s == s.min()
+                                return ['background-color: lightgreen' if v else '' for v in is_min]
+                            
+                            st.dataframe(
+                                display_fab.style.apply(highlight_min, subset=['Satış TL/Kg']).format({
+                                    'NTS (₺/Kg)': '{:.2f}',
+                                    'Nakliye (₺/Kg)': '{:.4f}',
+                                    'Toplam Maliyet (₺/Kg)': '{:.2f}',
+                                    'Satış TL/Kg': '{:.2f}',
+                                    'Satış $/Kg': '{:.4f}',
+                                    'Satış €/Kg': '{:.4f}',
+                                    'Satış ₣/Kg': '{:.4f}'
+                                }),
+                                use_container_width=True,
+                                hide_index=True
+                            )
+            else:
+                st.warning("❌ Hesaplanabilir fiyat bulunamadı.")
+        else:
+            st.warning("❌ Sonuç verisi bulunamadı.")
 
-                styled_df = display_df.style.apply(row_style, axis=1).map(
-                    lambda v: color_scale(v, min_val, max_val), subset=value_cols
-                ).format({
-                    'NTS_TL': lambda v: '-' if pd.isna(v) else f"{v:.2f}",
-                    'Nakliye_TL': lambda v: '-' if pd.isna(v) else f"{v:.2f}",
-                    'Toplam_Maliyet_TL': lambda v: '-' if pd.isna(v) else f"{v:.2f}",
-                    'Satis_TL': lambda v: '-' if pd.isna(v) else f"{v:.2f}",
-                    'Satis_USD_KG': lambda v: '-' if pd.isna(v) else f"${v:.4f}",
-                    'Satis_EUR_KG': lambda v: '-' if pd.isna(v) else f"€{v:.4f}",
-                    'Satis_CHF_KG': lambda v: '-' if pd.isna(v) else f"₣{v:.4f}",
-                    'Satis_TL_TON': lambda v: '-' if pd.isna(v) else f"{v:,.2f} ₺",
-                    'Satis_USD_TON': lambda v: '-' if pd.isna(v) else f"${v:,.2f}",
-                    'Satis_EUR_TON': lambda v: '-' if pd.isna(v) else f"€{v:,.2f}",
-                    'Satis_CHF_TON': lambda v: '-' if pd.isna(v) else f"₣{v:,.2f}",
-                })
-                
-                # HasPrice kolonunu gizle
-                final_display = display_df.drop(columns=['HasPrice'])
-                final_styled = styled_df.hide(subset=['HasPrice'], axis='columns')
-
-                st.dataframe(final_styled, use_container_width=True, hide_index=True)
-
-                if 'kullanilan_kurlar' in st.session_state:
-                    kur_tarihi = st.session_state['kullanilan_kurlar'].get('source_date', st.session_state['kullanilan_kurlar'].get('date', 'Bilinmiyor'))
-                    kur_usd = st.session_state['kullanilan_kurlar'].get('USD', 0)
-                    st.caption(f"💱 Hesaplama Kur Tarihi: {kur_tarihi} | USD: {kur_usd:.4f} ₺")
-
-        # Hesaplama kaydı butonu - session state'teki en_ucuz'u kullan
+        # Hesaplama kaydı butonu
         kayit_en_ucuz = st.session_state.get('en_ucuz')
         if kayit_en_ucuz:
             st.markdown("---")
             st.info("✅ Hesaplama tamamlandı. Kaydetmek için butona basın.")
             if st.button("💾 Hesaplamayı Kaydet", type="primary", key="kaydet_btn"):
                 kayit_kurlar = st.session_state.get('kullanilan_kurlar', kurlar)
+                
+                # Kur tarihini kayıt tarihi olarak al
+                kur_tarihi_str = kayit_kurlar.get('source_date', datetime.now().strftime('%Y-%m-%d'))
+                
                 record = {
-                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'timestamp': kur_tarihi_str + ' ' + datetime.now().strftime('%H:%M:%S'),  # Kur tarihi + saat
                     'username': st.session_state.username,
                     'musteri': st.session_state.get('musteri_adi_kayit', ''),
+                    'bayi_musteri': st.session_state.get('bayi_musteri_kayit', ''),
                     'urun': st.session_state.get('secili_urun', ''),
                     'sehir': st.session_state.get('secili_sehir', ''),
                     'fabrika': kayit_en_ucuz['Fabrika'],
@@ -909,10 +933,29 @@ if page == "Fiyat Hesaplama":
                     'usd_kur': kayit_kurlar.get('USD', 0),
                     'eur_kur': kayit_kurlar.get('EUR', 0),
                     'chf_kur': kayit_kurlar.get('CHF', 0),
-                    'kur_tarihi': st.session_state.get('kullanilan_kurlar', {}).get('source_date', datetime.now().strftime('%Y-%m-%d')),
+                    'kur_tarihi': kur_tarihi_str,
                     'urun_kayit_tarihi': st.session_state.get('urun_kayit_tarihi', '')
                 }
                 append_calc_record(record)
+                
+                # Bayi müşteri hesaplama sayısını güncelle
+                BAYI_MUSTERI_FILE = "bayi_musterileri.json"
+                if os.path.exists(BAYI_MUSTERI_FILE):
+                    with open(BAYI_MUSTERI_FILE, 'r', encoding='utf-8') as f:
+                        bayi_musteriler = json.load(f)
+                    
+                    current_user = st.session_state.username
+                    bayi_musteri_kayit = st.session_state.get('bayi_musteri_kayit', '')
+                    
+                    if current_user in bayi_musteriler and bayi_musteri_kayit:
+                        for musteri in bayi_musteriler[current_user]:
+                            if musteri['adi'] == bayi_musteri_kayit:
+                                musteri['toplam_hesaplama'] = musteri.get('toplam_hesaplama', 0) + 1
+                                break
+                        
+                        with open(BAYI_MUSTERI_FILE, 'w', encoding='utf-8') as f:
+                            json.dump(bayi_musteriler, f, indent=2, ensure_ascii=False)
+                
                 st.success("📜 Hesaplama kaydedildi!")
                 st.balloons()
 
@@ -921,89 +964,532 @@ if page == "Fiyat Hesaplama":
 # =========================================================
 elif page == "Yeni Ürün Ekle":
     st.header("➕ Yeni Ürün / NTS Maliyeti Ekle")
-
-    tab_tl, tab_usd, tab_eur = st.tabs(["💵 TL Girişi", "💲 USD Girişi", "💶 EUR / CHF Girişi"])
-
-    with tab_tl:
-        with st.form("yeni_urun_form_tl"):
-            st.markdown("Aynı üründen birden çok kayıt ekleyebilirsiniz (fiyat güncellemeleri için).")
-            col1, col2 = st.columns(2)
-            with col1:
-                yeni_urun_adi = st.text_input("Ürün Adı", key="tl_urun")
-                yeni_fabrika = st.selectbox("Fabrika", ["TR14", "TR15", "TR16"], key="tl_fabrika")
-            with col2:
-                yeni_nts_maliyet = st.number_input("NTS Maliyet (TL/Kg)", min_value=0.0, step=0.01, format="%.4f", key="tl_nts")
-                yeni_tarih = st.date_input("Kayıt Tarihi", value=datetime.now(), key="tl_tarih")
-
-            submitted = st.form_submit_button("💾 Kaydet (TL)")
-            if submitted:
-                if yeni_urun_adi and yeni_nts_maliyet > 0:
-                    save_new_product(yeni_urun_adi, yeni_fabrika, yeni_nts_maliyet, yeni_tarih)
-                    st.success(f"✅ {yeni_urun_adi} ({yeni_fabrika}) {yeni_nts_maliyet:.4f} TL/Kg olarak eklendi")
-                    st.rerun()
+    
+    # Kayıt tarihi için session state
+    if 'secili_kayit_tarihi' not in st.session_state:
+        st.session_state.secili_kayit_tarihi = datetime.now()
+    
+    # Kur bilgileri - kayıt tarihine göre
+    usd_kur = kurlar.get('USD', 0)
+    eur_kur = kurlar.get('EUR', 0)
+    chf_kur = kurlar.get('CHF', 0)
+    kur_tarihi = kurlar.get('source_date', 'Bilinmiyor')
+    
+    # Kur bilgilerini göster
+    col_kur1, col_kur2, col_kur3, col_kur4 = st.columns(4)
+    with col_kur1:
+        st.metric("💵 USD", f"{usd_kur:.4f} ₺")
+    with col_kur2:
+        st.metric("💶 EUR", f"{eur_kur:.4f} ₺")
+    with col_kur3:
+        st.metric("💷 CHF", f"{chf_kur:.4f} ₺")
+    with col_kur4:
+        st.info(f"📅 Kur Tarihi\n\n{kur_tarihi}")
+    
+    if kurlar.get('is_fallback'):
+        fallback_info = f"⚠️ "
+        if kurlar.get('used_date'):
+            fallback_info += f"Seçili tarih için kur bulunamadı. {kurlar.get('used_date')} tarihli kur kullanılıyor."
+        else:
+            fallback_info += "Hafta sonu/tatil nedeniyle önceki iş günü kuru kullanılıyor."
+        st.warning(fallback_info)
+    
+    st.markdown("---")
+    
+    # Tarih seçimi ve kur güncelleme
+    col_tarih1, col_tarih2 = st.columns([3, 1])
+    with col_tarih1:
+        secilen_tarih = st.date_input("📅 Kur ve Kayıt Tarihi Seçin", value=datetime.now(), key="kayit_tarihi_sec")
+    with col_tarih2:
+        st.write("")
+        st.write("")
+        if st.button("🔄 Bu Tarihin Kurlarını Getir", type="secondary"):
+            # Seçilen tarihe göre kurları yeniden çek
+            yeni_kurlar = get_tcmb_rates(secilen_tarih)
+            st.session_state.secili_kayit_tarihi = secilen_tarih
+            st.session_state.yeni_urun_kurlar = yeni_kurlar
+            st.rerun()
+    
+    st.caption("💡 Seçilen tarih hem kur tarihi hem de kayıt tarihi olarak kullanılacaktır.")
+    
+    # Kayıt tarihi değişti mi kontrol et
+    if 'yeni_urun_kurlar' in st.session_state:
+        kurlar_kayit = st.session_state.yeni_urun_kurlar
+        usd_kur = kurlar_kayit.get('USD', 0)
+        eur_kur = kurlar_kayit.get('EUR', 0)
+        chf_kur = kurlar_kayit.get('CHF', 0)
+        
+        # Güncellenen kurları göster
+        st.success(f"✅ {secilen_tarih.strftime('%d.%m.%Y')} tarihine göre kurlar yüklendi")
+        col_k1, col_k2, col_k3 = st.columns(3)
+        with col_k1:
+            st.info(f"💵 USD: {usd_kur:.4f} ₺")
+        with col_k2:
+            st.info(f"💶 EUR: {eur_kur:.4f} ₺")
+        with col_k3:
+            st.info(f"💷 CHF: {chf_kur:.4f} ₺")
+        
+        if kurlar_kayit.get('is_fallback') and kurlar_kayit.get('used_date'):
+            st.warning(f"⚠️ Seçili tarih için kur bulunamadı. {kurlar_kayit.get('used_date')} tarihli kur kullanılıyor.")
+    
+    st.markdown("---")
+    
+    # Tek form ile tüm girişler
+    with st.form("yeni_urun_form"):
+        st.markdown("### 📝 Ürün Bilgileri")
+        st.caption("Aynı üründen birden çok kayıt ekleyebilirsiniz (fiyat güncellemeleri için).")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            yeni_urun_adi = st.text_input("Ürün Adı *", key="urun_adi")
+        with col2:
+            yeni_fabrika = st.selectbox("Fabrika *", ["TR14", "TR15", "TR16"], key="fabrika")
+        with col3:
+            form_tarih = st.date_input("Kayıt Tarihi", value=secilen_tarih, key="tarih", disabled=True)
+            st.caption("↑ Kur tarihiyle aynı")
+        
+        # Form içinde kullanılacak kurlar
+        if 'yeni_urun_kurlar' in st.session_state:
+            form_usd_kur = st.session_state.yeni_urun_kurlar.get('USD', usd_kur)
+            form_eur_kur = st.session_state.yeni_urun_kurlar.get('EUR', eur_kur)
+            form_chf_kur = st.session_state.yeni_urun_kurlar.get('CHF', chf_kur)
+        else:
+            form_usd_kur = usd_kur
+            form_eur_kur = eur_kur
+            form_chf_kur = chf_kur
+        
+        st.markdown("---")
+        st.markdown("### 💰 Fiyat Girişi")
+        
+        # Hangi para biriminde gireceğini seç
+        para_birimi = st.radio(
+            "Fiyat Hangi Para Biriminde?",
+            ["TL", "USD", "EUR", "CHF"],
+            horizontal=True,
+            key="para_birimi"
+        )
+        
+        st.caption(f"💡 Fiyatı **{para_birimi}** cinsinden girin. Diğer döviz karşılıkları otomatik hesaplanacaktır.")
+        
+        # Seçilen para birimine göre input göster
+        col_input, col_spacer = st.columns([1, 3])
+        
+        with col_input:
+            if para_birimi == "TL":
+                girilen_fiyat = st.number_input("💵 TL/Kg *", min_value=0.0, step=0.01, format="%.4f", key="fiyat_input")
+                tl_karsilik = girilen_fiyat
+            elif para_birimi == "USD":
+                girilen_fiyat = st.number_input("💲 USD/Kg *", min_value=0.0, step=0.01, format="%.4f", key="fiyat_input")
+                tl_karsilik = girilen_fiyat * form_usd_kur
+            elif para_birimi == "EUR":
+                girilen_fiyat = st.number_input("💶 EUR/Kg *", min_value=0.0, step=0.01, format="%.4f", key="fiyat_input")
+                tl_karsilik = girilen_fiyat * form_eur_kur
+            else:  # CHF
+                girilen_fiyat = st.number_input("💷 CHF/Kg *", min_value=0.0, step=0.01, format="%.4f", key="fiyat_input")
+                tl_karsilik = girilen_fiyat * form_chf_kur
+                tl_karsilik = girilen_fiyat * chf_kur
+        
+        # Tüm döviz karşılıklarını göster
+        if girilen_fiyat > 0:
+            st.markdown("#### 💱 Döviz Karşılıkları")
+            col_d1, col_d2, col_d3, col_d4 = st.columns(4)
+            
+            with col_d1:
+                if para_birimi == "TL":
+                    st.metric("💵 TL/Kg", f"{girilen_fiyat:.4f}", delta="Girilen")
                 else:
-                    st.error("❌ Lütfen tüm alanları doldurun!")
-
-    with tab_usd:
-        usd_kur = kurlar.get('USD', 0)
-        kur_tarih_usd = kurlar.get('source_date', 'Bilinmiyor')
-        st.info(f"USD kuru: {usd_kur:.4f} ₺ | Kur tarihi: {kur_tarih_usd}")
-        if kurlar.get('is_fallback'):
-            st.warning("Hafta sonu/tatil nedeniyle önceki iş günü kuru kullanılıyor.")
-
-        with st.form("yeni_urun_form_usd"):
-            col1, col2 = st.columns(2)
-            with col1:
-                usd_urun = st.text_input("Ürün Adı", key="usd_urun")
-                usd_fabrika = st.selectbox("Fabrika", ["TR14", "TR15", "TR16"], key="usd_fabrika")
-            with col2:
-                usd_fiyat = st.number_input("USD Fiyat (Kg)", min_value=0.0, step=0.01, format="%.4f", key="usd_fiyat")
-                usd_tarih = st.date_input("Kayıt Tarihi", value=datetime.now(), key="usd_tarih")
-
-            tl_karsilik = usd_fiyat * usd_kur
-            st.caption(f"Anlık TL karşılığı: {tl_karsilik:.4f} TL/Kg")
-
-            submit_usd = st.form_submit_button("💾 Kaydet (USD→TL)")
-            if submit_usd:
-                if usd_urun and usd_fiyat > 0:
-                    save_new_product(usd_urun, usd_fabrika, tl_karsilik, usd_tarih)
-                    st.success(f"✅ {usd_urun} ({usd_fabrika}) {usd_fiyat:.4f} $/Kg ({tl_karsilik:.4f} TL/Kg) olarak kaydedildi")
-                    st.rerun()
+                    st.metric("💵 TL/Kg", f"{tl_karsilik:.4f}")
+            
+            with col_d2:
+                if para_birimi == "USD":
+                    st.metric("💲 USD/Kg", f"{girilen_fiyat:.4f}", delta="Girilen")
                 else:
-                    st.error("❌ Lütfen tüm alanları doldurun!")
-
-    with tab_eur:
-        eur_chf_secim = st.selectbox("Döviz", ["EUR", "CHF"], key="eur_secim")
-        secili_kur = kurlar.get(eur_chf_secim, 0)
-        kur_tarih_eur = kurlar.get('source_date', 'Bilinmiyor')
-        st.info(f"{eur_chf_secim} kuru: {secili_kur:.4f} ₺ | Kur tarihi: {kur_tarih_eur}")
-        if kurlar.get('is_fallback'):
-            st.warning("Hafta sonu/tatil nedeniyle önceki iş günü kuru kullanılıyor.")
-
-        with st.form("yeni_urun_form_eur"):
-            col1, col2 = st.columns(2)
-            with col1:
-                eur_urun = st.text_input("Ürün Adı", key="eur_urun")
-                eur_fabrika = st.selectbox("Fabrika", ["TR14", "TR15", "TR16"], key="eur_fabrika")
-            with col2:
-                eur_fiyat = st.number_input(f"{eur_chf_secim} Fiyat (Kg)", min_value=0.0, step=0.01, format="%.4f", key="eur_fiyat")
-                eur_tarih = st.date_input("Kayıt Tarihi", value=datetime.now(), key="eur_tarih")
-
-            tl_karsilik_eur = eur_fiyat * secili_kur
-            st.caption(f"Anlık TL karşılığı: {tl_karsilik_eur:.4f} TL/Kg")
-
-            submit_eur = st.form_submit_button("💾 Kaydet (Döviz→TL)")
-            if submit_eur:
-                if eur_urun and eur_fiyat > 0:
-                    save_new_product(eur_urun, eur_fabrika, tl_karsilik_eur, eur_tarih)
-                    st.success(f"✅ {eur_urun} ({eur_fabrika}) {eur_fiyat:.4f} {eur_chf_secim}/Kg ({tl_karsilik_eur:.4f} TL/Kg) olarak kaydedildi")
-                    st.rerun()
+                    usd_karsilik = tl_karsilik / form_usd_kur if form_usd_kur > 0 else 0
+                    st.metric("💲 USD/Kg", f"{usd_karsilik:.4f}")
+            
+            with col_d3:
+                if para_birimi == "EUR":
+                    st.metric("💶 EUR/Kg", f"{girilen_fiyat:.4f}", delta="Girilen")
                 else:
-                    st.error("❌ Lütfen tüm alanları doldurun!")
+                    eur_karsilik = tl_karsilik / form_eur_kur if form_eur_kur > 0 else 0
+                    st.metric("💶 EUR/Kg", f"{eur_karsilik:.4f}")
+            
+            with col_d4:
+                if para_birimi == "CHF":
+                    st.metric("💷 CHF/Kg", f"{girilen_fiyat:.4f}", delta="Girilen")
+                else:
+                    chf_karsilik = tl_karsilik / form_chf_kur if form_chf_kur > 0 else 0
+                    st.metric("💷 CHF/Kg", f"{chf_karsilik:.4f}")
+            
+            st.success(f"✅ **Veritabanına kaydedilecek:** {tl_karsilik:.4f} TL/Kg")
+            
+            # Kullanılan kur bilgisini göster
+            if 'yeni_urun_kurlar' in st.session_state:
+                kur_bilgi = st.session_state.yeni_urun_kurlar.get('source_date', '')
+                if kur_bilgi:
+                    st.caption(f"📅 Hesaplama Tarihi: {kur_bilgi}")
+        
+        st.markdown("---")
+        
+        submitted = st.form_submit_button("💾 ÜRÜNÜ KAYDET", type="primary", use_container_width=True)
+        
+        if submitted:
+            if not yeni_urun_adi:
+                st.error("❌ Ürün adı zorunludur!")
+            elif girilen_fiyat <= 0:
+                st.error("❌ Fiyat 0'dan büyük olmalıdır!")
+            else:
+                # Kur bilgilerini hazırla
+                kur_tarihi_kayit = None
+                if 'yeni_urun_kurlar' in st.session_state:
+                    kur_tarihi_kayit = st.session_state.yeni_urun_kurlar.get('source_date', '')
+                
+                # Kaydet - Tüm bilgilerle
+                save_new_product(
+                    urun_adi=yeni_urun_adi,
+                    fabrika=yeni_fabrika,
+                    nts_maliyet=tl_karsilik,
+                    tarih=secilen_tarih,
+                    para_birimi=para_birimi,
+                    giris_fiyat=girilen_fiyat,
+                    kur_usd=form_usd_kur,
+                    kur_eur=form_eur_kur,
+                    kur_chf=form_chf_kur,
+                    kur_tarihi=kur_tarihi_kayit
+                )
+                
+                # Kur bilgisini göster
+                kur_info = ""
+                if kur_tarihi_kayit:
+                    kur_info = f" (Kur Tarihi: {kur_tarihi_kayit})"
+                
+                st.success(f"🎉 **{yeni_urun_adi}** ({yeni_fabrika}) → {girilen_fiyat:.4f} {para_birimi}/Kg = **{tl_karsilik:.4f} TL/Kg** olarak kaydedildi!{kur_info}")
+                st.balloons()
+                st.rerun()
 
     st.markdown("---")
-    st.subheader("📂 Mevcut Ürünler")
-    st.dataframe(df_products.sort_values('Kayit_Tarihi', ascending=False), use_container_width=True, hide_index=True)
+    st.subheader("� Excel/CSV Dosyasından Toplu Ekleme")
+    
+    with st.expander("📋 Dosya Formatı Hakkında Bilgi"):
+        st.info("""
+        **Gerekli Kolonlar:**
+        - `Urun_Adi` veya `Ürün Adı`
+        - `Fabrika` (TR14, TR15, TR16)
+        - `NTS_Maliyet_TL` veya `Maliyet` veya `Fiyat`
+        
+        **Desteklenen Formatlar:** Excel (.xlsx, .xls) veya CSV (.csv)
+        
+        **Not:** Kayıt tarihi otomatik olarak eklenecektir.
+        """)
+        
+        # Örnek şablon göster
+        sample_df = pd.DataFrame({
+            'Urun_Adi': ['Örnek Ürün 1', 'Örnek Ürün 2'],
+            'Fabrika': ['TR14', 'TR15'],
+            'NTS_Maliyet_TL': [12.50, 15.75]
+        })
+        st.dataframe(sample_df, use_container_width=True, hide_index=True)
+    
+    uploaded_file = st.file_uploader("📁 Excel veya CSV Dosyası Seçin", type=['xlsx', 'xls', 'csv'], key="excel_upload")
+    
+    if uploaded_file is not None:
+        try:
+            # Dosya tipine göre okuma
+            if uploaded_file.name.endswith('.csv'):
+                uploaded_df = pd.read_csv(uploaded_file)
+            else:
+                uploaded_df = pd.read_excel(uploaded_file)
+            
+            st.success(f"✅ Dosya yüklendi: {len(uploaded_df)} satır bulundu")
+            
+            # Kolon isimleri eşleştirme
+            column_mapping = {}
+            for col in uploaded_df.columns:
+                col_lower = col.lower().strip()
+                if 'urun' in col_lower or 'ürün' in col_lower:
+                    column_mapping[col] = 'Urun_Adi'
+                elif 'fabrika' in col_lower:
+                    column_mapping[col] = 'Fabrika'
+                elif 'maliyet' in col_lower or 'fiyat' in col_lower or 'tl' in col_lower:
+                    column_mapping[col] = 'NTS_Maliyet_TL'
+            
+            uploaded_df = uploaded_df.rename(columns=column_mapping)
+            
+            # Gerekli kolonları kontrol et
+            required_cols = ['Urun_Adi', 'Fabrika', 'NTS_Maliyet_TL']
+            missing_cols = [col for col in required_cols if col not in uploaded_df.columns]
+            
+            if missing_cols:
+                st.error(f"❌ Eksik kolonlar: {', '.join(missing_cols)}")
+                st.warning("Lütfen dosyanızın gerekli kolonları içerdiğinden emin olun.")
+            else:
+                # Veri önizleme
+                st.subheader("📊 Veri Önizleme")
+                preview_df = uploaded_df[required_cols].head(10)
+                st.dataframe(preview_df, use_container_width=True, hide_index=True)
+                
+                # İstatistikler
+                col_stat1, col_stat2, col_stat3 = st.columns(3)
+                with col_stat1:
+                    st.metric("📦 Toplam Kayıt", len(uploaded_df))
+                with col_stat2:
+                    st.metric("🏭 Fabrika Sayısı", uploaded_df['Fabrika'].nunique())
+                with col_stat3:
+                    st.metric("🔢 Benzersiz Ürün", uploaded_df['Urun_Adi'].nunique())
+                
+                # Fabrika dağılımı
+                fab_counts = uploaded_df['Fabrika'].value_counts()
+                st.write("**Fabrika Dağılımı:**")
+                for fab, count in fab_counts.items():
+                    st.write(f"- {fab}: {count} kayıt")
+                
+                # Import butonu
+                col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+                with col_btn2:
+                    if st.button("✅ ÜRÜNLER İ EKLE", type="primary", use_container_width=True):
+                        # Tarih ekle
+                        uploaded_df['Kayit_Tarihi'] = datetime.now().strftime('%d.%m.%Y')
+                        
+                        # Sadece gerekli kolonları al
+                        new_products = uploaded_df[['Urun_Adi', 'Fabrika', 'NTS_Maliyet_TL', 'Kayit_Tarihi']].copy()
+                        
+                        # Mevcut verilere ekle
+                        df_products = pd.concat([df_products, new_products], ignore_index=True)
+                        df_products.to_csv(PRODUCT_FILE, index=False)
+                        
+                        st.success(f"🎉 {len(new_products)} ürün başarıyla eklendi!")
+                        st.balloons()
+                        st.rerun()
+        
+        except Exception as e:
+            st.error(f"❌ Dosya okuma hatası: {str(e)}")
+            st.warning("Lütfen dosya formatını kontrol edin.")
+
+    st.markdown("---")
+    st.subheader("�📂 Mevcut Ürünler")
+    
+    # Arama ve filtreleme
+    col_search1, col_search2 = st.columns([3, 1])
+    with col_search1:
+        search_term = st.text_input("🔍 Ürün Ara", placeholder="Ürün adı yazın...", key="urun_ara")
+    with col_search2:
+        fab_filter = st.selectbox("🏭 Fabrika Filtrele", ["Tümü", "TR14", "TR15", "TR16"], key="fab_filtre")
+    
+    # Filtreleme uygula
+    display_products = df_products.copy()
+    if search_term:
+        display_products = display_products[display_products['Urun_Adi'].str.contains(search_term, case=False, na=False)]
+    if fab_filter != "Tümü":
+        display_products = display_products[display_products['Fabrika'] == fab_filter]
+    
+    display_products = display_products.sort_values('Kayit_Tarihi', ascending=False)
+    
+    st.info(f"📊 Toplam {len(display_products)} kayıt bulundu")
+    
+    # Ürün silme alanı (sadece yönetici için)
+    if st.session_state.username == ADMIN_USERNAME:
+        with st.expander("🗑️ Ürün Silme İşlemleri (YÖNETİCİ)"):
+            st.warning("⚠️ Dikkat! Bu işlem geri alınamaz.")
+            
+            delete_col1, delete_col2, delete_col3 = st.columns(3)
+            with delete_col1:
+                delete_urun = st.selectbox("Silinecek Ürün", sorted(df_products['Urun_Adi'].unique()), key="sil_urun")
+            with delete_col2:
+                delete_fabrika = st.selectbox("Fabrika", ["Tümü", "TR14", "TR15", "TR16"], key="sil_fabrika")
+            with delete_col3:
+                st.write("")
+                st.write("")
+                if delete_fabrika == "Tümü":
+                    if st.button("🗑️ TÜM FABRİKALARDAN SİL", type="secondary"):
+                        df_products = df_products[df_products['Urun_Adi'] != delete_urun]
+                        df_products.to_csv(PRODUCT_FILE, index=False)
+                        st.success(f"✅ '{delete_urun}' tüm fabrikalardan silindi!")
+                        st.balloons()
+                        st.rerun()
+                else:
+                    if st.button(f"🗑️ {delete_fabrika}'dan SİL", type="secondary"):
+                        df_products = df_products[~((df_products['Urun_Adi'] == delete_urun) & (df_products['Fabrika'] == delete_fabrika))]
+                        df_products.to_csv(PRODUCT_FILE, index=False)
+                        st.success(f"✅ '{delete_urun}' ({delete_fabrika}) silindi!")
+                        st.balloons()
+                        st.rerun()
+            
+            # Toplu silme
+            st.markdown("---")
+            st.markdown("##### 🗂️ Toplu Silme")
+            st.warning("⚠️ Aşağıdaki işlemler çok sayıda kaydı etkileyebilir!")
+            
+            toplu_col1, toplu_col2 = st.columns(2)
+            with toplu_col1:
+                toplu_fabrika = st.selectbox("Fabrika Seç", ["TR14", "TR15", "TR16"], key="toplu_sil_fab")
+            with toplu_col2:
+                st.write("")
+                st.write("")
+                if st.button(f"🗑️ {toplu_fabrika} FABRİKADAKİ TÜM ÜRÜNLERİ SİL", type="secondary"):
+                    etkilenen = len(df_products[df_products['Fabrika'] == toplu_fabrika])
+                    df_products = df_products[df_products['Fabrika'] != toplu_fabrika]
+                    df_products.to_csv(PRODUCT_FILE, index=False)
+                    st.success(f"✅ {toplu_fabrika} fabrikasından {etkilenen} kayıt silindi!")
+                    st.rerun()
+    
+    # Döviz karşılıklarını hesapla ve ekle
+    display_products_with_currencies = display_products.copy()
+    
+    # Kayıt Tarihini datetime formatına çevir
+    if 'Kayit_Tarihi' in display_products_with_currencies.columns:
+        display_products_with_currencies['Kayit_Tarihi'] = pd.to_datetime(
+            display_products_with_currencies['Kayit_Tarihi'], 
+            format='%d.%m.%Y', 
+            errors='coerce'
+        )
+    
+    # Index'i kaydet (silme için gerekli)
+    display_products_with_currencies = display_products_with_currencies.reset_index(drop=False)
+    display_products_with_currencies = display_products_with_currencies.rename(columns={'index': 'original_index'})
+    
+    # Yeni kolonları ekle - Girilen para birimi ve orijinal fiyat
+    if 'Giris_Para_Birimi' not in display_products_with_currencies.columns:
+        display_products_with_currencies['Giris_Para_Birimi'] = 'TL'
+    if 'Giris_Fiyat' not in display_products_with_currencies.columns:
+        display_products_with_currencies['Giris_Fiyat'] = display_products_with_currencies['NTS_Maliyet_TL']
+    if 'Kur_USD' not in display_products_with_currencies.columns:
+        display_products_with_currencies['Kur_USD'] = ''
+    if 'Kur_EUR' not in display_products_with_currencies.columns:
+        display_products_with_currencies['Kur_EUR'] = ''
+    if 'Kur_CHF' not in display_products_with_currencies.columns:
+        display_products_with_currencies['Kur_CHF'] = ''
+    if 'Kur_Tarihi' not in display_products_with_currencies.columns:
+        display_products_with_currencies['Kur_Tarihi'] = ''
+    
+    # Döviz karşılıklarını hesapla - KAYDEDİLEN KURLARA GÖRE
+    # Eğer kayıtlı kur varsa onu kullan, yoksa güncel kuru kullan (eski kayıtlar için)
+    def calculate_currency(row):
+        tl_value = row['NTS_Maliyet_TL']
+        
+        # Kayıtlı kurları kontrol et
+        try:
+            saved_usd = float(row['Kur_USD']) if row['Kur_USD'] and str(row['Kur_USD']).strip() else None
+            saved_eur = float(row['Kur_EUR']) if row['Kur_EUR'] and str(row['Kur_EUR']).strip() else None
+            saved_chf = float(row['Kur_CHF']) if row['Kur_CHF'] and str(row['Kur_CHF']).strip() else None
+        except:
+            saved_usd = None
+            saved_eur = None
+            saved_chf = None
+        
+        # Güncel kurlar (fallback)
+        current_usd = kurlar.get('USD', 1)
+        current_eur = kurlar.get('EUR', 1)
+        current_chf = kurlar.get('CHF', 1)
+        
+        # Kurları seç (kayıtlı varsa onu, yoksa güncel)
+        use_usd = saved_usd if saved_usd else current_usd
+        use_eur = saved_eur if saved_eur else current_eur
+        use_chf = saved_chf if saved_chf else current_chf
+        
+        return pd.Series({
+            'USD/Kg': round(tl_value / use_usd, 4) if use_usd > 0 else 0,
+            'EUR/Kg': round(tl_value / use_eur, 4) if use_eur > 0 else 0,
+            'CHF/Kg': round(tl_value / use_chf, 4) if use_chf > 0 else 0
+        })
+    
+    # Döviz karşılıklarını hesapla
+    currency_cols = display_products_with_currencies.apply(calculate_currency, axis=1)
+    display_products_with_currencies[['USD/Kg', 'EUR/Kg', 'CHF/Kg']] = currency_cols
+    
+    # Kolon sırasını düzenle
+    display_products_with_currencies = display_products_with_currencies[[
+        'original_index', 'Urun_Adi', 'Fabrika', 
+        'Giris_Para_Birimi', 'Giris_Fiyat',
+        'NTS_Maliyet_TL', 'USD/Kg', 'EUR/Kg', 'CHF/Kg', 
+        'Kayit_Tarihi', 'Kur_Tarihi'
+    ]]
+    
+    # Kur bilgisi
+    st.info(f"💡 **Döviz karşılıkları her ürünün KENDİ kayıt tarihindeki kurla hesaplanmıştır.** Güncel kur ({kur_tarihi}): USD={kurlar.get('USD', 0):.4f}, EUR={kurlar.get('EUR', 0):.4f}, CHF={kurlar.get('CHF', 0):.4f}")
+    
+    # Tablo görünümü - data_editor ile satır silme özelliği
+    st.markdown("##### 📊 Ürün Listesi (Satırları düzenleyebilir veya silebilirsiniz)")
+    st.caption(f"📊 Toplam **{len(display_products_with_currencies)}** kayıt gösteriliyor")
+    
+    edited_df = st.data_editor(
+        display_products_with_currencies,
+        use_container_width=True,
+        hide_index=True,
+        height=500,
+        num_rows="dynamic",  # Satır ekleme/silme aktif
+        disabled=['original_index', 'USD/Kg', 'EUR/Kg', 'CHF/Kg', 'Kur_Tarihi'],  # Otomatik hesaplananlar salt okunur
+        column_config={
+            "original_index": None,  # Gizle
+            "Urun_Adi": st.column_config.TextColumn("Ürün Adı", width="large", required=True),
+            "Fabrika": st.column_config.SelectboxColumn("Fabrika", options=["TR14", "TR15", "TR16"], width="small", required=True),
+            "Giris_Para_Birimi": st.column_config.SelectboxColumn("💱 Para Birimi", options=["TL", "USD", "EUR", "CHF"], width="small", help="Girilen para birimi"),
+            "Giris_Fiyat": st.column_config.NumberColumn("📝 Girilen Fiyat", format="%.4f", width="medium", help="Orijinal girilen fiyat"),
+            "NTS_Maliyet_TL": st.column_config.NumberColumn("💵 TL/Kg", format="%.4f", width="medium", required=True),
+            "USD/Kg": st.column_config.NumberColumn("💲 USD/Kg", format="%.4f", width="medium"),
+            "EUR/Kg": st.column_config.NumberColumn("💶 EUR/Kg", format="%.4f", width="medium"),
+            "CHF/Kg": st.column_config.NumberColumn("💷 CHF/Kg", format="%.4f", width="medium"),
+            "Kayit_Tarihi": st.column_config.DateColumn("📅 Kayıt Tarihi", format="DD.MM.YYYY", width="medium"),
+            "Kur_Tarihi": st.column_config.TextColumn("📅 Kur Tarihi", width="medium", help="Kullanılan kur tarihi")
+        },
+        key="products_editor"
+    )
+    
+    # Değişiklikleri kaydet butonu
+    col_save1, col_save2, col_save3 = st.columns([1, 1, 1])
+    with col_save2:
+        if st.button("💾 DEĞİŞİKLİKLERİ KAYDET", type="primary", use_container_width=True):
+            # Silinen satırları tespit et
+            original_indices = set(display_products_with_currencies['original_index'].tolist())
+            edited_indices = set(edited_df['original_index'].tolist())
+            deleted_indices = original_indices - edited_indices
+            
+            # Silinen satırları ana dataframe'den çıkar
+            if deleted_indices:
+                df_products_filtered = df_products.drop(index=list(deleted_indices))
+                df_products_filtered.to_csv(PRODUCT_FILE, index=False)
+                st.success(f"✅ {len(deleted_indices)} satır silindi ve değişiklikler kaydedildi!")
+                st.balloons()
+                st.rerun()
+            else:
+                # Düzenlenmiş verileri güncelle
+                degisiklik_sayisi = 0
+                for idx, row in edited_df.iterrows():
+                    orig_idx = row['original_index']
+                    if orig_idx in df_products.index:
+                        # Değişiklikleri kontrol et ve kaydet
+                        if df_products.loc[orig_idx, 'Urun_Adi'] != row['Urun_Adi']:
+                            df_products.loc[orig_idx, 'Urun_Adi'] = row['Urun_Adi']
+                            degisiklik_sayisi += 1
+                        if df_products.loc[orig_idx, 'Fabrika'] != row['Fabrika']:
+                            df_products.loc[orig_idx, 'Fabrika'] = row['Fabrika']
+                            degisiklik_sayisi += 1
+                        if df_products.loc[orig_idx, 'NTS_Maliyet_TL'] != row['NTS_Maliyet_TL']:
+                            df_products.loc[orig_idx, 'NTS_Maliyet_TL'] = row['NTS_Maliyet_TL']
+                            degisiklik_sayisi += 1
+                        if df_products.loc[orig_idx, 'Giris_Para_Birimi'] != row['Giris_Para_Birimi']:
+                            df_products.loc[orig_idx, 'Giris_Para_Birimi'] = row['Giris_Para_Birimi']
+                            degisiklik_sayisi += 1
+                        if df_products.loc[orig_idx, 'Giris_Fiyat'] != row['Giris_Fiyat']:
+                            df_products.loc[orig_idx, 'Giris_Fiyat'] = row['Giris_Fiyat']
+                            degisiklik_sayisi += 1
+                        
+                        # Tarihi düzgün formatta kaydet
+                        if pd.notna(row['Kayit_Tarihi']):
+                            if isinstance(row['Kayit_Tarihi'], str):
+                                tarih_str = row['Kayit_Tarihi']
+                            else:
+                                tarih_str = row['Kayit_Tarihi'].strftime('%d.%m.%Y')
+                            df_products.loc[orig_idx, 'Kayit_Tarihi'] = tarih_str
+                
+                df_products.to_csv(PRODUCT_FILE, index=False)
+                if degisiklik_sayisi > 0:
+                    st.success(f"✅ {degisiklik_sayisi} değişiklik kaydedildi!")
+                else:
+                    st.info("ℹ️ Hiçbir değişiklik yapılmadı.")
+                st.rerun()
+    
+    st.info("💡 **İpucu:** Tabloda istediğiniz hücreyi tıklayarak düzenleyebilirsiniz. Satır silmek için soldaki ❌ butonuna tıklayın. Tüm değişiklikler için 'Değişiklikleri Kaydet' butonuna basın.")
 
 # =========================================================
 # SAYFA 3: LOJİSTİK YÖNETİMİ
@@ -1136,7 +1622,135 @@ elif page == "Lojistik Fiyat Güncelleme":
         st.success("✅ Nakliye veritabanı güncellendi!")
         st.rerun()
 
-elif page == "📜 Hesaplama Geçmişi":
+elif page == "� Bayi Müşteri Yönetimi":
+    st.header("👥 Bayi Müşteri Yönetimi")
+    
+    # Bayi müşteri dosyası
+    BAYI_MUSTERI_FILE = "bayi_musterileri.json"
+    
+    # Bayi müşteri verilerini yükle
+    def load_bayi_musteriler():
+        if os.path.exists(BAYI_MUSTERI_FILE):
+            with open(BAYI_MUSTERI_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return {}
+    
+    def save_bayi_musteriler(data):
+        with open(BAYI_MUSTERI_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    
+    bayi_musteriler = load_bayi_musteriler()
+    current_user = st.session_state.username
+    
+    # Kullanıcının müşteri listesi
+    if current_user not in bayi_musteriler:
+        bayi_musteriler[current_user] = []
+    
+    st.markdown(f"### 🏢 {current_user} - Müşteri Listesi")
+    
+    # Yeni müşteri ekleme
+    with st.expander("➕ Yeni Müşteri Ekle", expanded=True):
+        col1, col2, col3 = st.columns([2, 2, 1])
+        
+        with col1:
+            yeni_musteri_adi = st.text_input("👤 Müşteri Adı", key="yeni_musteri_adi", placeholder="Örn: ABC İnşaat Ltd.")
+        
+        with col2:
+            yeni_musteri_tel = st.text_input("📞 Telefon", key="yeni_musteri_tel", placeholder="0555 555 55 55")
+        
+        with col3:
+            st.write("")
+            st.write("")
+            if st.button("✅ EKLE", type="primary"):
+                if yeni_musteri_adi.strip():
+                    # Müşteri zaten var mı kontrol et
+                    musteri_varmi = any(m['adi'] == yeni_musteri_adi.strip() for m in bayi_musteriler[current_user])
+                    
+                    if musteri_varmi:
+                        st.error(f"❌ '{yeni_musteri_adi}' zaten kayıtlı!")
+                    else:
+                        yeni_musteri = {
+                            "adi": yeni_musteri_adi.strip(),
+                            "telefon": yeni_musteri_tel.strip() if yeni_musteri_tel.strip() else "-",
+                            "kayit_tarihi": datetime.now().strftime('%d.%m.%Y %H:%M'),
+                            "toplam_hesaplama": 0
+                        }
+                        bayi_musteriler[current_user].append(yeni_musteri)
+                        save_bayi_musteriler(bayi_musteriler)
+                        st.success(f"✅ '{yeni_musteri_adi}' müşterisi eklendi!")
+                        st.balloons()
+                        st.rerun()
+                else:
+                    st.error("❌ Müşteri adı boş olamaz!")
+    
+    st.markdown("---")
+    
+    # Müşteri listesi
+    if bayi_musteriler[current_user]:
+        st.subheader(f"📋 Müşterilerim ({len(bayi_musteriler[current_user])} adet)")
+        
+        # Arama
+        search_musteri = st.text_input("🔍 Müşteri Ara", placeholder="Müşteri adı yazın...", key="musteri_ara")
+        
+        # Filtreleme
+        filtered_musteriler = bayi_musteriler[current_user]
+        if search_musteri:
+            filtered_musteriler = [m for m in filtered_musteriler if search_musteri.lower() in m['adi'].lower()]
+        
+        if filtered_musteriler:
+            # DataFrame formatında göster
+            musteri_df = pd.DataFrame(filtered_musteriler)
+            musteri_df = musteri_df[['adi', 'telefon', 'kayit_tarihi', 'toplam_hesaplama']]
+            musteri_df.columns = ['Müşteri Adı', 'Telefon', 'Kayıt Tarihi', 'Toplam Hesaplama']
+            
+            st.dataframe(musteri_df, use_container_width=True, hide_index=True, height=400)
+            
+            # Müşteri silme
+            if st.session_state.username == ADMIN_USERNAME or True:  # Tüm bayiler kendi müşterilerini silebilir
+                with st.expander("🗑️ Müşteri Silme İşlemleri"):
+                    st.warning("⚠️ Dikkat! Silinen müşteri geri getirilemez.")
+                    
+                    col_del1, col_del2 = st.columns([3, 1])
+                    with col_del1:
+                        silinecek_musteri = st.selectbox(
+                            "Silinecek Müşteri",
+                            [m['adi'] for m in bayi_musteriler[current_user]],
+                            key="sil_musteri"
+                        )
+                    with col_del2:
+                        st.write("")
+                        st.write("")
+                        if st.button("🗑️ SİL", type="secondary"):
+                            bayi_musteriler[current_user] = [
+                                m for m in bayi_musteriler[current_user] if m['adi'] != silinecek_musteri
+                            ]
+                            save_bayi_musteriler(bayi_musteriler)
+                            st.success(f"✅ '{silinecek_musteri}' silindi!")
+                            st.rerun()
+        else:
+            st.info("🔍 Arama sonucu bulunamadı")
+    
+    else:
+        st.info("📭 Henüz müşteri eklemediniz. Yukarıdan yeni müşteri ekleyebilirsiniz.")
+    
+    # İstatistikler
+    st.markdown("---")
+    st.subheader("📊 İstatistikler")
+    
+    col_stat1, col_stat2, col_stat3 = st.columns(3)
+    with col_stat1:
+        st.metric("👥 Toplam Müşteri", len(bayi_musteriler[current_user]))
+    with col_stat2:
+        toplam_hesap = sum(m.get('toplam_hesaplama', 0) for m in bayi_musteriler[current_user])
+        st.metric("📊 Toplam Hesaplama", toplam_hesap)
+    with col_stat3:
+        if bayi_musteriler[current_user]:
+            ort_hesap = toplam_hesap / len(bayi_musteriler[current_user])
+            st.metric("📈 Ortalama Hesaplama", f"{ort_hesap:.1f}")
+        else:
+            st.metric("📈 Ortalama Hesaplama", "0")
+
+elif page == "�📜 Hesaplama Geçmişi":
     st.header("📜 Hesaplama Geçmişi")
     ensure_calc_history_file()
     df_hist = pd.read_csv(CALC_HISTORY_FILE)
@@ -1148,14 +1762,24 @@ elif page == "📜 Hesaplama Geçmişi":
 
         col_f1, col_f2, col_f3 = st.columns(3)
         with col_f1:
-            f_musteri = st.selectbox("Müşteri", [''] + sorted(df_hist['musteri'].dropna().unique().tolist()))
+            f_musteri = st.selectbox("Müşteri (Bayi)", [''] + sorted(df_hist['musteri'].dropna().unique().tolist()))
         with col_f2:
-            f_urun = st.selectbox("Ürün", [''] + sorted(df_hist['urun'].dropna().unique().tolist()))
+            f_bayi_musteri = st.selectbox("Bayi Müşteri", [''] + sorted(df_hist['bayi_musteri'].dropna().unique().tolist()) if 'bayi_musteri' in df_hist.columns else [''])
         with col_f3:
+            f_urun = st.selectbox("Ürün", [''] + sorted(df_hist['urun'].dropna().unique().tolist()))
+        
+        col_f4, col_f5, col_f6 = st.columns(3)
+        with col_f4:
             f_user = st.selectbox("Kullanıcı", [''] + sorted(df_hist['username'].dropna().unique().tolist()))
+        with col_f5:
+            st.write("")
+        with col_f6:
+            st.write("")
 
         if f_musteri:
             df_hist = df_hist[df_hist['musteri'] == f_musteri]
+        if f_bayi_musteri and 'bayi_musteri' in df_hist.columns:
+            df_hist = df_hist[df_hist['bayi_musteri'] == f_bayi_musteri]
         if f_urun:
             df_hist = df_hist[df_hist['urun'] == f_urun]
         if f_user:
@@ -1166,4 +1790,48 @@ elif page == "📜 Hesaplama Geçmişi":
         csv_data = df_hist.to_csv(index=False).encode('utf-8')
         st.download_button("⬇️ CSV Olarak İndir", csv_data, "hesaplama_gecmisi.csv", mime="text/csv")
 
-        st.dataframe(df_hist, use_container_width=True, hide_index=True)
+        st.markdown("---")
+        st.markdown("##### 📊 Hesaplama Kayıtları (Satırları silebilirsiniz)")
+        
+        # Index'i ekle
+        df_hist_display = df_hist.reset_index(drop=False)
+        df_hist_display = df_hist_display.rename(columns={'index': 'original_index'})
+        
+        # Düzenlenebilir tablo
+        edited_hist = st.data_editor(
+            df_hist_display,
+            use_container_width=True,
+            hide_index=True,
+            height=500,
+            num_rows="dynamic",
+            disabled=[col for col in df_hist_display.columns if col != 'original_index'],  # Tüm kolonlar salt okunur
+            column_config={
+                "original_index": None,  # Gizle
+                "timestamp": st.column_config.DatetimeColumn("Tarih/Saat", format="DD.MM.YYYY HH:mm:ss"),
+            },
+            key="history_editor"
+        )
+        
+        # Kaydet butonu
+        col_save1, col_save2, col_save3 = st.columns([1, 1, 1])
+        with col_save2:
+            if st.button("💾 SİLİNEN SATIRLARI KALDIR", type="primary", use_container_width=True):
+                # Tüm geçmişi oku
+                df_all_hist = pd.read_csv(CALC_HISTORY_FILE)
+                
+                # Silinen satırları tespit et
+                original_indices = set(df_hist_display['original_index'].tolist())
+                edited_indices = set(edited_hist['original_index'].tolist())
+                deleted_indices = original_indices - edited_indices
+                
+                if deleted_indices:
+                    # Silinen satırları çıkar
+                    df_all_hist = df_all_hist.drop(index=list(deleted_indices))
+                    df_all_hist.to_csv(CALC_HISTORY_FILE, index=False)
+                    st.success(f"✅ {len(deleted_indices)} kayıt silindi!")
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.info("ℹ️ Silinecek kayıt bulunamadı.")
+        
+        st.info("💡 **İpucu:** Satırı silmek için soldaki ❌ butonuna tıklayın, ardından 'Silinen Satırları Kaldır' butonuna basın.")
